@@ -1,16 +1,18 @@
-# concurrent data structure
+# Concurrent Data Structure
 
-## 简介
+## Introduction
 
-常见并发数据的c语言实现(包含垃圾回收)。
+C language implementation of common concurrent data structure(including garbage collection).
 
-## 目录
+## Content
 
 * linked list
   * optimistic synchronization
   
-## 参考资料
+## References
 
 The art of multiprocessor programming (revised reprint)
 
 linux kenerl 
+
+Michael M M. Hazard pointers: Safe memory reclamation for lock-free objects
