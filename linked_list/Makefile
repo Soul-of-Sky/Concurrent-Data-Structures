@@ -5,7 +5,7 @@ RM = rm
 
 all: linked_list
 
-linked_list: linked_list.c
+linked_list: linked_list.c test.c
 	$(CC) $^ $(CFLAGS) $(LDFLAGS) -o $@
 
 clean:

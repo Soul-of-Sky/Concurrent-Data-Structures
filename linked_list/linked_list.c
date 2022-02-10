@@ -38,7 +38,7 @@ void free_ll_node(struct ll_node *node)
 
 void print_entry(entry_t entry)
 {
-	prinf("%lu %lu\n", entry.key, entry.value);
+	printf("%lu %lu\n", entry.key, entry.value);
 	return;
 }
 
@@ -145,7 +145,7 @@ int ll_lookup(struct linked_list *ll, pkey_t key)
 	{
 		pred = ll->head;
 		curr = pred->next;
-		while (key_cmp(node_key(curr), key) <= 0)
+		while (key_cmp(node_key(curr), key) < 0)	//loop until curr->key >= key
 		{
 			pred = curr;
 			curr = curr->next;
@@ -173,7 +173,7 @@ int ll_remove(struct linked_list *ll, pkey_t key)
 	{
 		pred = ll->head;
 		curr = pred->next;
-		while (key_cmp(node_key(curr), key) <= 0)
+		while (key_cmp(node_key(curr), key) < 0)	//loop until curr->key >= key
 		{
 			pred = curr;
 			curr = curr->next;
@@ -211,7 +211,7 @@ int ll_range(struct linked_list *ll, pkey_t low, pkey_t high, entry_t *res_arr)
 		curr = curr->next;
 	while (key_cmp(node_key(curr), high) <= 0)
 	{
-		res_arr[size++] = node_val(curr);
+		res_arr[size++] = curr->e;
 		curr = curr->next;
 	}
 
