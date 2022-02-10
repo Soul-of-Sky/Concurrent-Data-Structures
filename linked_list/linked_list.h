@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#include "inc/spinlock.h"
+#include "spinlock.h"
 
 typedef uint64_t pkey_t;
 typedef uint64_t pval_t;
