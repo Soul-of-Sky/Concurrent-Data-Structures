@@ -8,27 +8,28 @@
 typedef uint64_t pkey_t;
 typedef uint64_t pval_t;
 
-typedef struct entry {
+typedef struct entry
+{
     pkey_t key;
     pval_t value;
-}entry_t;
+} entry_t;
 
-struct ll_node {
+struct ll_node
+{
     entry_t e;
     spinlock_t lock;
-    struct ll_node* next;
+    struct ll_node *next;
 };
 
-struct hp_item;
-
-struct linked_list {
+struct linked_list
+{
     struct ll_node *head, *tail;
     int hp_count;
     struct hp_item** hp;
 };
 
-#define node_key(node) ((node)->e.k)
-#define node_val(node) ((node)->e.v)
+#define node_key(node) ((node)->e.key)
+#define node_val(node) ((node)->e.value)
 
 extern struct linked_list* ll_init();
 extern int ll_insert(struct linked_list* ll, pkey_t key, pval_t val);
@@ -69,4 +70,4 @@ struct hp_item {
 // extern void hp_clear_all_addr(struct hp_item* hp);
 // extern void hp_retire_node(struct linked_list* ll, struct hp_item* hp, hp_t hp_addr);
 
-#endif
+#endif //LINKED_LIST_H
