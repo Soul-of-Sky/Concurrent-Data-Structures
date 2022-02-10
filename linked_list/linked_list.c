@@ -32,9 +32,8 @@ struct ll_node *init_ll_node(pkey_t key, pval_t value, struct ll_node *next)
 
 void free_ll_node(struct ll_node *node)
 {
-	//free(node->e);
-	free(node);
-	return;
+	// free(node);
+	// return;
 }
 
 void print_entry(entry_t entry)
