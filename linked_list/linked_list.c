@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <assert.h>
 #include <unistd.h>
+#include <limits.h>
 
 #include "linked_list.h"
 
@@ -15,9 +16,6 @@ static int key_cmp(pkey_t key_a, pkey_t key_b)
 	else
 		return 1;
 }
-
-const pkey_t TAIL_KEY = ~0; //key of sentinel node head and tail
-const pkey_t HEAD_KEY = 0;
 
 struct ll_node *init_ll_node(pkey_t key, pval_t value, struct ll_node *next)
 {
@@ -47,8 +45,8 @@ struct linked_list *ll_init()
 	struct linked_list *ll;
 	ll = malloc(sizeof(struct linked_list));
 
-	ll->tail = init_ll_node(TAIL_KEY, 0, NULL);
-	ll->head = init_ll_node(HEAD_KEY, 0, ll->tail);
+	ll->tail = init_ll_node(ULONG_MAX, 0, NULL);
+	ll->head = init_ll_node(0, 0, ll->tail);
 
 	return ll;
 }
