@@ -81,9 +81,8 @@ int ll_insert(struct linked_list *ll, pkey_t key, pval_t val)
 			pred = curr;
 			curr = curr->next;
 		}
-
-		spin_lock(&(pred->lock)); //lock before validate
 		spin_lock(&(curr->lock));
+		spin_lock(&(pred->lock)); //lock before validate
 		if (validate(ll, pred, curr) == 0)
 		{
 			if (key_cmp(node_key(curr), key) == 0)
@@ -97,6 +96,8 @@ int ll_insert(struct linked_list *ll, pkey_t key, pval_t val)
 			spin_unlock(&(pred->lock));
 			return ret;
 		}
+		spin_unlock(&(curr->lock)); //always unlock
+		spin_unlock(&(pred->lock));
 	} //end of
 } //end of ll_insert()
 
@@ -118,6 +119,7 @@ int ll_update(struct linked_list *ll, pkey_t key, pval_t val)
 
 		spin_lock(&(curr->lock));
 		spin_lock(&(pred->lock));
+
 		if (validate(ll, pred, curr) == 0)
 		{
 			if (key_cmp(node_key(curr), key) == 0)
@@ -132,6 +134,8 @@ int ll_update(struct linked_list *ll, pkey_t key, pval_t val)
 			spin_unlock(&(pred->lock));
 			return ret;
 		}
+		spin_unlock(&(curr->lock)); //always unlock
+		spin_unlock(&(pred->lock));
 	} //end of while (1)
 } // end of ll_update;
 
@@ -145,7 +149,7 @@ int ll_lookup(struct linked_list *ll, pkey_t key)
 	{
 		pred = ll->head;
 		curr = pred->next;
-		while (key_cmp(node_key(curr), key) < 0)	//loop until curr->key >= key
+		while (key_cmp(node_key(curr), key) < 0) //loop until curr->key >= key
 		{
 			pred = curr;
 			curr = curr->next;
@@ -161,6 +165,8 @@ int ll_lookup(struct linked_list *ll, pkey_t key)
 			spin_unlock(&(pred->lock));
 			return ret;
 		}
+		spin_unlock(&(curr->lock)); //always unlock
+		spin_unlock(&(pred->lock));
 	} //end of while (1)
 } // end of ll_lookup()
 
@@ -173,7 +179,7 @@ int ll_remove(struct linked_list *ll, pkey_t key)
 	{
 		pred = ll->head;
 		curr = pred->next;
-		while (key_cmp(node_key(curr), key) < 0)	//loop until curr->key >= key
+		while (key_cmp(node_key(curr), key) < 0) //loop until curr->key >= key
 		{
 			pred = curr;
 			curr = curr->next;
@@ -196,6 +202,8 @@ int ll_remove(struct linked_list *ll, pkey_t key)
 			spin_unlock(&(pred->lock));
 			return ret;
 		}
+		spin_unlock(&(curr->lock)); //always unlock
+		spin_unlock(&(pred->lock));
 
 	} //end of while (1)
 } // end of ll_remove()
