@@ -92,7 +92,7 @@ retry:
     }
 }
 
-int ll_remove(struct ll* ll, lkey_t k, lval_t* v) {
+int ll_lookup(struct ll* ll, lkey_t k, lval_t* v) {
     struct ll_node *pred, *curr;
 
 retry:

@@ -3,11 +3,11 @@ CFLAGS = -g -O0 -I ../include
 LDFLAGS = -lpthread
 RM = rm
 
-all: linked_list
+all: lazy_test
 
-linked_list: linked_list.c test.c
+lazy_test: lazy/linked_list.c lazy/test.c
 	$(CC) $^ $(CFLAGS) $(LDFLAGS) -o $@
 
 clean:
-	$(RM) linked_list
+	$(RM) lazy_test
 	$(RM) *.o
