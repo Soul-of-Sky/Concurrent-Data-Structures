@@ -79,15 +79,18 @@ retry:
             write_unlock(&pred->lock);
             write_unlock(&curr->lock);
             return -EEXIST;
-        }
-        node = malloc_node(k, v);
-        node->next = curr;
-        pred->next = node;
+        } else {
+            node = malloc_node(k, v);
+            node->next = curr;
+            pred->next = node;
 
+            write_unlock(&pred->lock);
+            write_unlock(&curr->lock);
+            return 0;
+        }
+    } else {
         write_unlock(&pred->lock);
         write_unlock(&curr->lock);
-        return 0;
-    } else {
         goto retry;
     }
 }
@@ -143,6 +146,8 @@ retry:
             return -ENOENT;
         }
     } else {
+        write_unlock(&pred->lock);
+        write_unlock(&curr->lock);
         goto retry;
     }
 }

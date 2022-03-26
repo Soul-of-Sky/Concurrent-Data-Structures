@@ -4,21 +4,27 @@
 #include <pthread.h>
 #include <time.h>
 #include <sys/time.h>
+#include <assert.h>
+#include <errno.h>
 
 #include "pthread_barrier.h"
 #include "linked_list.h"
 
-#define N           10000
+#define N           100000
 #define NUM_THREAD  12
 
-#ifdef DEBUG
-#define test_print(fmt, args ...) do{printf(fmt, ##args)}while(0)
+#define RAND
+// #define DETAIL
+// #define ASSERT
+
+#ifdef DETAIL
+#define test_print(fmt, args ...) do{printf(fmt, ##args);}while(0)
 #else
 #define test_print(fmt, args ...) do{}while(0)
 #endif
 
 #ifdef ASSERT
-#define test_assert(arg) do{assert(arg)}while(0)
+#define test_assert(arg) do{assert(arg);}while(0)
 #else
 #define test_assert(arg) do{}while(0)
 #endif
@@ -99,9 +105,10 @@ static void do_lookup(long id, int expect_ret) {
 
     for (i = st; i < ed; i++) {
         ret = ll_lookup(ll, k[i], &__v);
-        test_assert(ret == expect_ret && __v == v[i] || expect_ret == -1);
+        asm volatile("" : : "r"(ret) : "memory");
+        test_assert(ret == expect_ret || expect_ret == -1);
     }
-
+    
     interval = end_measure();
     test_print("thread[%ld] end in %.3lf seconds\n", interval);
 }
@@ -131,6 +138,7 @@ static void do_range(long id) {
     start_measure();
 
     ret = ll_range(ll, 0, N, v_arr);
+    asm volatile("" : : "r"(ret) : "memory");
     test_assert(ret == N);
     for (i = 0; i < N; i++) {
         test_assert(v_arr[i] == i);
@@ -166,7 +174,7 @@ void* test(void* arg) {
 
     do_barrier(id, "REMOVE");
 
-    do_lookup(id, 1);
+    do_lookup(id, -ENOENT);
 
     do_barrier(id, "LOOKUP");
 }
@@ -174,12 +182,14 @@ void* test(void* arg) {
 int main() {
     int i;
 
+    gen_data();
+
     ll = ll_init();
     
     pthread_barrier_init(&barrier, NULL, NUM_THREAD);
 
     for (i = 0; i < NUM_THREAD; i++) {
-        pthread_create(tids[i], NULL, test, (void*) i);
+        pthread_create(&tids[i], NULL, test, (void*) i);
     }
 
     for (i = 0; i < NUM_THREAD; i++) {
