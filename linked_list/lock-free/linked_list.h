@@ -18,7 +18,6 @@ typedef size_t markable_t;
 
 struct ll_node {
     entry_t e;
-    rwlock_t lock;
     markable_t next;
 };
 

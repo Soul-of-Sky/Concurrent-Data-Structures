@@ -20,7 +20,6 @@ static struct ll_node* malloc_node(lkey_t k, lval_t v) {
     node->next = NULL;
     node->e.k = k;
     node->e.v = v;
-    rwlock_init(&node->lock);
 
     return node;
 }
@@ -96,7 +95,7 @@ retry:
         node = malloc_node(k, v);
         node->next = curr;
         
-        if (!cmpxchg2(&__pred->next, curr, node)) {
+        if (!cmpxchg2(&pred->next, curr, node)) {
             free_node(node);
             goto retry;
         }
