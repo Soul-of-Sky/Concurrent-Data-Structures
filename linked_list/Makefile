@@ -3,11 +3,15 @@ CFLAGS = -g -O2 -I ../include
 LDFLAGS = -lpthread
 RM = rm
 
-all: lazy_test
+all: lazy_sync_test lock_free_test
 
-lazy_test: lazy/linked_list.c lazy/test.c
-	$(CC) $^ $(CFLAGS) $(LDFLAGS) -o $@
+lazy_sync_test: lazy-sync/linked_list.c test.c
+	$(CC) $^ $(CFLAGS) -I lazy-sync $(LDFLAGS) -o $@
+
+lock_free_test: lock-free/linked_list.c test.c
+	$(CC) $^ $(CFLAGS) -I lock-free $(LDFLAGS) -o $@
 
 clean:
-	$(RM) lazy_test
+	$(RM) lazy_sync_test 
+	$(RM) lock_free_test
 	$(RM) *.o
