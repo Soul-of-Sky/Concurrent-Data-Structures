@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -g -O0 -I ../inc
+CFLAGS = -g -O0 -I ../include
 LDFLAGS = -lpthread
 RM = rm
 

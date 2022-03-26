@@ -7,7 +7,8 @@ C language implementation of common concurrent data structure(including garbage 
 ## Content
 
 * linked list
-  * optimistic synchronization
+  * lazy synchronization
+  * lock-free
   
 ## References
 
