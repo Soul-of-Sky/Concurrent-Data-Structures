@@ -33,7 +33,7 @@ struct ll {
 
 extern struct ll* ll_init();
 extern void ll_destroy(struct ll* ll);
-extern struct int ll_insert(struct ll* ll, lkey_t k, lval_t v);
+extern int ll_insert(struct ll* ll, lkey_t k, lval_t v);
 extern int ll_lookup(struct ll* ll, lkey_t k, lval_t* v);
 extern int ll_remove(struct ll* ll, lkey_t k);
 extern int ll_range(struct ll* ll, lkey_t k, unsigned int len, lval_t* v_arr);

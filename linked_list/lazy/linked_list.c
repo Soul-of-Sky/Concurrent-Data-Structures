@@ -8,8 +8,6 @@
 
 #include "linked_list.h"
 
-#define LL_DEBUG
-
 static int k_cmp(lkey_t a, lkey_t b) {
     if (a < b) return -1;
     if (a > b) return 1;
