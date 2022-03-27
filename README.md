@@ -2,7 +2,7 @@
 
 ## Introduction
 
-C language implementation of common concurrent data structure(including garbage collection).
+C language implementation of common concurrent data structure(Using hazard pointers to solve garbage collection problem).
 
 ## Content
 
