@@ -17,7 +17,7 @@ static struct q_node* alloc_node(qval_t v) {
 
 struct queue* q_init() {
     struct queue* q = (struct queue*) malloc(sizeof(struct queue));
-    struct q_node* node = alloc_node(NULL);
+    struct q_node* node = alloc_node(0);
     
     q->head = node;
     q->tail = node;
@@ -63,8 +63,10 @@ void q_push(struct queue* q, qval_t v) {
     }
 }
 
-qval_t q_pop(struct queue* q) {
+int q_pop(struct queue* q, qval_t* v) {
     struct q_node *first, *last, *next;
+
+    *v = 0;
 
     while(1) {
         last = q->tail;
@@ -73,20 +75,38 @@ qval_t q_pop(struct queue* q) {
         if (first == q->head) {
             if (first == last) {
                 if (next == NULL) {
-                    return NULL;
+                    return -ENOENT;
                 }
                 cmpxchg2(&q->tail, last, next);
             } else {
+                *v = next->v;
                 if (cmpxchg2(&q->head, first, next)) {
-                    return next->v;
+                    return 0;
                 }
             }
         }
     }
 }
 
-qval_t q_top(struct queue* q) {
-    struct q_node *first = q->head;
+int q_top(struct queue* q, qval_t* v) {
+    struct q_node *first, *last, *next;
 
-    return first->v;
+    *v = 0;
+
+    while(1) {
+        last = q->tail;
+        first = q->head;
+        next = first->next;
+        if (first == q->head) {
+            if (first == last) {
+                if (next == NULL) {
+                    return -ENOENT;
+                }
+                cmpxchg2(&q->tail, last, next);
+            } else {
+                *v = next->v;
+                return 0;
+            }
+        }
+    }
 }
