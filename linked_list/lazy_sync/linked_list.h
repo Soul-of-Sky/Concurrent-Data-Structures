@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "rwlock.h"
+#include "spinlock.h"
 
 typedef uint64_t lkey_t;
 typedef char*    lval_t;
@@ -18,7 +18,7 @@ typedef size_t markable_t;
 
 struct ll_node {
     entry_t e;
-    rwlock_t lock;
+    spinlock_t lock;
     markable_t next;
 };
 

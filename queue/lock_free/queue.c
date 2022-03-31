@@ -88,7 +88,7 @@ int q_pop(struct queue* q, qval_t* v) {
     }
 }
 
-int q_top(struct queue* q, qval_t* v) {
+int q_front(struct queue* q, qval_t* v) {
     struct q_node *first, *last, *next;
 
     *v = 0;

@@ -20,7 +20,7 @@ static struct ll_node* malloc_node(lkey_t k, lval_t v) {
     node->next = NULL;
     node->e.k = k;
     node->e.v = v;
-    rwlock_init(&node->lock);
+    spin_lock_init(&node->lock);
 
     return node;
 }
@@ -71,8 +71,8 @@ retry:
         curr = GET_NODE(pred->next);
     }
 
-    write_lock(&pred->lock);
-    write_lock(&curr->lock);
+    spin_lock(&pred->lock);
+    spin_lock(&curr->lock);
 
     if (validate(pred, curr)) {
         if (k_cmp(curr->e.k, k) == 0) {
@@ -128,8 +128,8 @@ retry:
         curr = GET_NODE(pred->next);
     }
 
-    write_lock(&pred->lock);
-    write_lock(&curr->lock);
+    spin_lock(&pred->lock);
+    spin_lock(&curr->lock);
 
     if (validate(pred, curr)) {
         if (k_cmp(curr->e.k, k) == 0) {
