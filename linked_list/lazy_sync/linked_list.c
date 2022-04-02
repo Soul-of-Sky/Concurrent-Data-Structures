@@ -8,13 +8,13 @@
 
 #include "linked_list.h"
 
-static int k_cmp(lkey_t a, lkey_t b) {
+static int k_cmp(ukey_t a, ukey_t b) {
     if (a < b) return -1;
     if (a > b) return 1;
     return 0;
 }
 
-static struct ll_node* malloc_node(lkey_t k, lval_t v) {
+static struct ll_node* malloc_node(ukey_t k, uval_t v) {
     struct ll_node* node = (struct ll_node*) malloc(sizeof(struct ll_node));
 
     node->next = NULL;
@@ -27,7 +27,7 @@ static struct ll_node* malloc_node(lkey_t k, lval_t v) {
 
 struct ll* ll_init() {
     struct ll* ll = (struct ll*) malloc(sizeof(struct ll));
-    lkey_t max_k = UINT64_MAX;
+    ukey_t max_k = UINT64_MAX;
 
     ll->head = malloc_node(0, 0);
     ll->tail = malloc_node(max_k, 0);
@@ -59,7 +59,7 @@ static int validate(struct ll_node* pred, struct ll_node* curr) {
     return !IS_MARKED(pred->next) && !IS_MARKED(curr->next) && GET_NODE(pred->next) == curr;
 }
 
-int ll_insert(struct ll* ll, lkey_t k, lval_t v) {
+int ll_insert(struct ll* ll, ukey_t k, uval_t v) {
     struct ll_node *pred, *curr, *node;
 
 retry:    
@@ -95,7 +95,7 @@ retry:
     }
 }
 
-int ll_lookup(struct ll* ll, lkey_t k, lval_t* v) {
+int ll_lookup(struct ll* ll, ukey_t k, uval_t* v) {
     struct ll_node *pred, *curr;
 
 retry:
@@ -116,7 +116,7 @@ retry:
     }
 }
 
-int ll_remove(struct ll* ll, lkey_t k) {
+int ll_remove(struct ll* ll, ukey_t k) {
     struct ll_node *pred, *curr;
 
 retry:
@@ -152,7 +152,7 @@ retry:
     }
 }
 
-int ll_range(struct ll* ll, lkey_t k, unsigned int len, lval_t* v_arr) {
+int ll_range(struct ll* ll, ukey_t k, unsigned int len, uval_t* v_arr) {
     struct ll_node *curr;
     int cnt = 0;
 

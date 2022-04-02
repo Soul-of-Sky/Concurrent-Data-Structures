@@ -6,7 +6,7 @@
 #include "queue.h"
 #include "atomic.h"
 
-static struct q_node* alloc_node(qval_t v) {
+static struct q_node* alloc_node(uval_t v) {
     struct q_node* node = (struct q_node*) malloc(sizeof(struct q_node));
 
     node->next = NULL;
@@ -43,7 +43,7 @@ void q_destroy(struct queue* q) {
     free(q);
 }
 
-void q_push(struct queue* q, qval_t v) {
+void q_push(struct queue* q, uval_t v) {
     struct q_node* node = alloc_node(v);
     struct q_node *last, *next;
 
@@ -63,7 +63,7 @@ void q_push(struct queue* q, qval_t v) {
     }
 }
 
-int q_pop(struct queue* q, qval_t* v) {
+int q_pop(struct queue* q, uval_t* v) {
     struct q_node *first, *last, *next;
 
     *v = 0;
@@ -88,7 +88,7 @@ int q_pop(struct queue* q, qval_t* v) {
     }
 }
 
-int q_front(struct queue* q, qval_t* v) {
+int q_front(struct queue* q, uval_t* v) {
     struct q_node *first, *last, *next;
 
     *v = 0;

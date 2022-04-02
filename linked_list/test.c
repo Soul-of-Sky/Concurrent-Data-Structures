@@ -30,13 +30,13 @@
 #endif
 
 __thread struct timeval t0, t1;
-__thread lval_t v_arr[N];
+__thread uval_t v_arr[N];
 
 pthread_barrier_t barrier;
 pthread_t tids[NUM_THREAD];
 
-lkey_t k[N];
-lval_t v[N];
+ukey_t k[N];
+uval_t v[N];
 
 struct ll* ll;
 
@@ -49,8 +49,8 @@ static void gen_data() {
     }
 
 #ifdef RAND
-    lkey_t temp_k;
-    lval_t temp_v;
+    ukey_t temp_k;
+    uval_t temp_v;
     int idx;
 
     srand(time(0));
@@ -96,7 +96,7 @@ static void do_insert(long id, int expect_ret) {
 static void do_lookup(long id, int expect_ret) {
     int st, ed, i, ret;
     double interval;
-    lval_t __v;
+    uval_t __v;
 
     start_measure();
 

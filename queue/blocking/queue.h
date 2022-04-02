@@ -6,11 +6,10 @@
 #include <pthread.h>
 
 #include "atomic.h"
-
-typedef size_t qval_t;
+#include "util.h"
 
 struct queue {
-    qval_t* buffer;
+    uval_t* buffer;
     unsigned int cap;
     int head, tail;
     pthread_mutex_t push_mutex, pop_mutex;
@@ -19,8 +18,8 @@ struct queue {
 
 extern struct queue* q_init(unsigned int size);
 extern void q_destroy(struct queue* q);
-extern void q_push(struct queue* q, qval_t v);
-extern int q_pop(struct queue* q, qval_t* v);
-extern int q_front(struct queue* q, qval_t* v);
+extern void q_push(struct queue* q, uval_t v);
+extern int q_pop(struct queue* q, uval_t* v);
+extern int q_front(struct queue* q, uval_t* v);
 
 #endif

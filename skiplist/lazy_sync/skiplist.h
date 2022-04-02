@@ -5,14 +5,7 @@
 #include <stdio.h>
 
 #include "spinlock.h"
-
-typedef uint64_t skey_t;
-typedef char*    sval_t;
-
-typedef struct {
-    skey_t k;
-    sval_t v;
-}entry_t;
+#include "util.h"
 
 typedef size_t markable_t;
 
@@ -40,10 +33,10 @@ struct sl {
 
 extern struct sl* sl_init(int max_levels);
 extern void sl_destroy(struct sl* sl);
-extern int sl_insert(struct sl* sl, skey_t k, sval_t v);
-extern int sl_lookup(struct sl* sl, skey_t k, sval_t* v);
-extern int sl_remove(struct sl* sl, skey_t k);
-extern int sl_range(struct sl* sl, skey_t k, unsigned int len, sval_t* v_arr);
+extern int sl_insert(struct sl* sl, ukey_t k, uval_t v);
+extern int sl_lookup(struct sl* sl, ukey_t k, uval_t* v);
+extern int sl_remove(struct sl* sl, ukey_t k);
+extern int sl_range(struct sl* sl, ukey_t k, unsigned int len, uval_t* v_arr);
 extern void ll_print(struct sl* sl);
 
 #ifdef SL_DEBUG

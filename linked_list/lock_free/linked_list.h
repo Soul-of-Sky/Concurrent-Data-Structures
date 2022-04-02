@@ -5,14 +5,7 @@
 #include <stdio.h>
 
 #include "atomic.h"
-
-typedef uint64_t lkey_t;
-typedef char*    lval_t;
-
-typedef struct {
-    lkey_t k;
-    lval_t v;
-}entry_t;
+#include "util.h"
 
 typedef size_t markable_t;
 
@@ -32,10 +25,10 @@ struct ll {
 
 extern struct ll* ll_init();
 extern void ll_destroy(struct ll* ll);
-extern int ll_insert(struct ll* ll, lkey_t k, lval_t v);
-extern int ll_lookup(struct ll* ll, lkey_t k, lval_t* v);
-extern int ll_remove(struct ll* ll, lkey_t k);
-extern int ll_range(struct ll* ll, lkey_t k, unsigned int len, lval_t* v_arr);
+extern int ll_insert(struct ll* ll, ukey_t k, uval_t v);
+extern int ll_lookup(struct ll* ll, ukey_t k, uval_t* v);
+extern int ll_remove(struct ll* ll, ukey_t k);
+extern int ll_range(struct ll* ll, ukey_t k, unsigned int len, uval_t* v_arr);
 extern void ll_print(struct ll* ll);
 
 #ifdef LL_DEBUG

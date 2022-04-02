@@ -8,7 +8,7 @@
 
 #include "skiplist.h"
 
-static struct sl_node* alloc_node(int levels, skey_t k, sval_t v) {
+static struct sl_node* alloc_node(int levels, ukey_t k, uval_t v) {
     unsigned int size = sizeof(struct sl_node) + levels * sizeof(markable_t);
     struct sl_node* node = aligned_alloc(8, size);
 
@@ -42,23 +42,52 @@ struct sl* sl_init(int max_levels) {
     return sl;
 }
 
+static void free_node(struct sl_node* node) {
+    free(node);
+}
+
 void sl_destroy(struct sl* sl) {
-    struct sl_node* node = sl->head;
+    struct sl_node *pred, *curr;
+    
+    pred = sl->head;
+    while(pred) {
+        curr = GET_NODE(pred->next);
+        free_node(pred);
+        pred = curr;
+    }
+
+    free(sl);
 }
 
-int sl_insert(struct sl* sl, skey_t k, sval_t v) {
+static int find(struct sl* sl, struct sl_node* preds, struct sl_node* succs) {
+    struct sl_node *pred, *curr;
+    int i;
+
+    pred = sl->head;
+    for (i = sl->max_levels - 1; i >= 0; i--) {
+        curr = GET_NODE(pred->next);
+        while()
+    }
+}
+
+int sl_insert(struct sl* sl, ukey_t k, uval_t v) {
+    const int max_levels = sl->max_levels;
+    struct sl_node* preds[max_levels];
+    struct sl_node* succs[max_levels];
+
+retry:
+    
+}
+
+int sl_lookup(struct sl* sl, ukey_t k, uval_t* v) {
 
 }
 
-int sl_lookup(struct sl* sl, skey_t k, sval_t* v) {
+int sl_remove(struct sl* sl, ukey_t k) {
 
 }
 
-int sl_remove(struct sl* sl, skey_t k) {
-
-}
-
-int sl_range(struct sl* sl, skey_t k, unsigned int len, sval_t* v_arr) {
+int sl_range(struct sl* sl, ukey_t k, unsigned int len, uval_t* v_arr) {
 
 }
 

@@ -9,7 +9,7 @@
 struct queue* q_init(unsigned int size) {
     struct queue* q = (struct queue*) malloc(sizeof(struct queue));
     
-    q->buffer = (qval_t*) malloc(size * sizeof(qval_t));
+    q->buffer = (uval_t*) malloc(size * sizeof(uval_t));
     q->cap = size;
     q->head = 0;
     q->tail = 0;

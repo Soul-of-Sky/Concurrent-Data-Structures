@@ -4,10 +4,10 @@
 #include <stdio.h>
 #include <stdint.h>
 
-typedef size_t qval_t;
+#include "util.h"
 
 struct q_node {
-    qval_t v;
+    uval_t v;
     struct q_node* next;
 }
 
@@ -17,8 +17,8 @@ struct queue {
 
 extern struct queue* q_init();
 extern void q_destroy(struct queue* q);
-extern void q_push(struct queue* q, qval_t v);
-extern int q_pop(struct queue* q, qval_t* v);
-extern int q_front(struct queue* q, qval_t* v);
+extern void q_push(struct queue* q, uval_t v);
+extern int q_pop(struct queue* q, uval_t* v);
+extern int q_front(struct queue* q, uval_t* v);
 
 #endif
