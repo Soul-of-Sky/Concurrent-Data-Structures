@@ -11,6 +11,7 @@ typedef size_t markable_t;
 
 struct sl_node {
     entry_t e;
+    int levels;
     spinlock_t lock;
     markable_t next[0];
 };
@@ -18,18 +19,25 @@ struct sl_node {
 struct sl {
     struct sl_node *head, *tail;
     int max_levels;
-    int levels;
+    volatile int levels;
 };
 
-#define IS_MARKED(v)        ((v) & 0x1)
-#define MARK_NODE(v)        ((v) | 0x1)
-#define REMOVE_MARK(v)      ((v) & ~0x1)
+#define IS_TAGED(v, t)      ((unsigned long) (v) & t)
+#define ADD_TAG(v, t)       ((unsigned long) (v) | t)
+#define DEL_TAG(v, t)       ((unsigned long) (v) & ~t)
 
-#define IS_FULLY_LINKED(v)  ((v) & 0x2)
-#define FULLY_LINK(v)       ((v) | 0x2)
-#define UNLINK(v)           ((v) & ~0x2)
+#define GET_SIGN(n)         (((struct sl_node*)n)->next[0])
 
-#define GET_NODE(v)         ((struct ll_node*) REMOVE_MARK(v))
+#define IS_MARKED(n)        IS_TAGED(GET_SIGN(n), 0x1)
+#define MARK_NODE(n)        ADD_TAG(GET_SIGN(n), 0x1)
+#define REMOVE_MARK(n)      DEL_TAG(GET_SIGN(n), 0x1)
+
+#define IS_FULLY_LINKED(n)  IS_TAGED(GET_SIGN(n), 0x2)
+#define FULLY_LINK(n)       ADD_TAG(GET_SIGN(n), 0x2)
+#define FULLY_LINK2(v)      ADD_TAG(v, 0x2)
+#define UNLINK(n)           DEL_TAG(GET_SIGN(n), 0x2)
+
+#define GET_NODE(v)         ((struct ll_node*) DEL_TAG(v, 0x3))
 
 extern struct sl* sl_init(int max_levels);
 extern void sl_destroy(struct sl* sl);
