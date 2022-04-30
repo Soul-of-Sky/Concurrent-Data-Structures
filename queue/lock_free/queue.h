@@ -9,11 +9,11 @@
 struct q_node {
     uval_t v;
     struct q_node* next;
-}
+};
 
 struct queue {
     struct q_node *head, *tail;
-}
+};
 
 extern struct queue* q_init();
 extern void q_destroy(struct queue* q);

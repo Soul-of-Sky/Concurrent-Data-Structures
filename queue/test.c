@@ -8,10 +8,12 @@
 #include <errno.h>
 
 #include "pthread_barrier.h"
-#include "linked_list.h"
+#include "queue.h"
 
 #define N           100000
-#define NUM_THREAD  12
+#define NUM_THREAD  4
+
+#define POOL_SIZE   100
 
 #define RAND
 // #define DETAIL
@@ -33,12 +35,13 @@ __thread struct timeval t0, t1;
 __thread uval_t v_arr[N];
 
 pthread_barrier_t barrier;
-pthread_t tids[NUM_THREAD];
+pthread_t tids1[NUM_THREAD];
+pthread_t tids2[NUM_THREAD];
 
 ukey_t k[N];
 uval_t v[N];
 
-struct ll* ll;
+struct queue* q;
 
 static void gen_data() {
     int i;
@@ -75,79 +78,6 @@ static double end_measure() {
     return t1.tv_sec - t0.tv_sec + (t1.tv_usec - t0.tv_usec) / 1e6;
 }
 
-static void do_insert(long id, int expect_ret) {
-    int st, ed, i, ret;
-    double interval;
-
-    start_measure();
-
-    st = 1.0 * id / NUM_THREAD * N;
-    ed = 1.0 * (id + 1) / NUM_THREAD * N;
-
-    for (i = st; i < ed; i++) {
-        ret = ll_insert(ll, k[i], v[i]);
-        test_assert(expect_ret == -1 || ret == expect_ret);
-    }
-
-    interval = end_measure();
-    test_print("thread[%ld] end in %.3lf seconds\n", interval);
-}
-
-static void do_lookup(long id, int expect_ret) {
-    int st, ed, i, ret;
-    double interval;
-    uval_t __v;
-
-    start_measure();
-
-    st = 1.0 * id / NUM_THREAD * N;
-    ed = 1.0 * (id + 1) / NUM_THREAD * N;
-
-    for (i = st; i < ed; i++) {
-        ret = ll_lookup(ll, k[i], &__v);
-        asm volatile("" : : "r"(ret) : "memory");
-        test_assert(expect_ret == -1 || ret == expect_ret);
-    }
-    
-    interval = end_measure();
-    test_print("thread[%ld] end in %.3lf seconds\n", interval);
-}
-
-static void do_remove(long id, int expect_ret) {
-    int st, ed, i, ret;
-    double interval;
-
-    start_measure();
-
-    st = 1.0 * id / NUM_THREAD * N;
-    ed = 1.0 * (id + 1) / NUM_THREAD * N;
-
-    for (i = st; i < ed; i++) {
-        ret = ll_remove(ll, k[i]);
-        test_assert(expect_ret == -1 || ret == expect_ret);
-    }
-
-    interval = end_measure();
-    test_print("thread[%ld] end in %.3lf seconds\n", interval);
-}
-
-static void do_range(long id) {
-    int st, ed, i, ret;
-    double interval;
-
-    start_measure();
-
-    ret = ll_range(ll, 0, N, v_arr);
-    asm volatile("" : : "r"(ret) : "memory");
-    test_assert(ret == N);
-    for (i = 0; i < N; i++) {
-        test_assert(v_arr[i] == i);
-    }
-
-    interval = end_measure();
-    test_print("thread[%ld] end in %.3lf seconds\n", interval);
-}
-
 static void do_barrier(long id, const char* arg) {
     pthread_barrier_wait(&barrier);
     if (id == 0) {
@@ -155,28 +85,57 @@ static void do_barrier(long id, const char* arg) {
     }
 }
 
-void* test(void* arg) {
+static void do_push(long id, int expect_ret) {
+    int st, ed, i, ret;
+    double interval;
+
+    start_measure();
+
+    st = 1.0 * id / NUM_THREAD * N;
+    ed = 1.0 * (id + 1) / NUM_THREAD * N;
+
+    for (i = st; i < ed; i++) {
+        q_push(q, v[i]);
+        test_assert(expect_ret == -1 || ret == expect_ret);
+    }
+
+    interval = end_measure();
+    test_print("thread[%ld] end in %.3lf seconds\n", interval);
+}
+
+static void do_pop(long id, int expect_ret) {
+    int st, ed, i, ret;
+    double interval;
+    uval_t v;
+
+    start_measure();
+
+    st = 1.0 * id / NUM_THREAD * N;
+    ed = 1.0 * (id + 1) / NUM_THREAD * N;
+
+    for (i = st; i < ed; i++) {
+        q_pop(q, &v);
+        test_assert(expect_ret == -1 || ret == expect_ret);
+    }
+
+    interval = end_measure();
+    test_print("thread[%ld] end in %.3lf seconds\n", interval);
+}
+
+void* push_fun(void* arg) {
     long id = (long) arg;
 
-    do_insert(id, 0);
+    do_push(id, -1);
 
-    do_barrier(id, "INSERT");
+    do_barrier(id, "PUSH");
+}
 
-    do_lookup(id, 0);
+void* pop_fun(void* arg) {
+    long id = (long) arg;
 
-    do_barrier(id, "LOOKUP");
+    do_pop(id, -1);
 
-    do_range(id);
-
-    do_barrier(id, "RANGE");
-
-    do_remove(id, 0);
-
-    do_barrier(id, "REMOVE");
-
-    do_lookup(id, -ENOENT);
-
-    do_barrier(id, "LOOKUP");
+    do_barrier(id, "POP");
 }
 
 int main() {
@@ -184,19 +143,21 @@ int main() {
 
     gen_data();
 
-    ll = ll_init();
+    q = q_init(POOL_SIZE);
     
     pthread_barrier_init(&barrier, NULL, NUM_THREAD);
 
     for (i = 0; i < NUM_THREAD; i++) {
-        pthread_create(&tids[i], NULL, test, (void*) i);
+        pthread_create(&tids1[i], NULL, push_fun, (void*) i);
+        pthread_create(&tids2[i], NULL, pop_fun, (void*) i);
     }
 
     for (i = 0; i < NUM_THREAD; i++) {
-        pthread_join(tids[i], NULL);
+        pthread_join(tids1[i], NULL);
+        pthread_join(tids2[i], NULL);
     }
 
-    ll_destroy(ll);
+    q_destroy(q);
 
     return 0;
 }

@@ -11,10 +11,44 @@ struct queue* q_init(unsigned int size) {
     
     q->buffer = (uval_t*) malloc(size * sizeof(uval_t));
     q->cap = size;
-    q->head = 0;
-    q->tail = 0;
+    q->used = 0;
 
-    pthread_mutex_init(&q->push_mutex, NULL);
-    pthread_cond_init(&q->not_)
+    return q;
 }
 
+void q_destroy(struct queue* q){
+    free(q->buffer);
+    free(q);
+}
+
+static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+
+void q_push(struct queue* q, uval_t v){
+    pthread_mutex_lock(&lock);
+    while(!(q->used < q->cap)) {
+        pthread_cond_wait(&cond, &lock);
+    }
+    q->buffer[q->used++] = v;
+    pthread_cond_signal(&cond);
+    pthread_mutex_unlock(&lock);
+}
+
+void q_pop(struct queue* q, uval_t* v){
+    pthread_mutex_lock(&lock);
+    while(!(q->used != 0)) {
+        pthread_cond_wait(&cond, &lock);
+    }
+    *v = q->buffer[--(q->used)];
+    pthread_cond_signal(&cond);
+    pthread_mutex_unlock(&lock);
+}
+
+int q_front(struct queue* q, uval_t* v){
+    if (q->used) {
+        *v = q->buffer[q->cap];
+        return 1;
+    }
+
+    return 0;
+}
