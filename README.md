@@ -25,8 +25,6 @@ memory reclamation:
 
 **QSBR**: quiescent-state-based reclamation, **EBR**: epoch-based reclaimation, **HPBR**: hazard-pointer-based reclaimation
 
-**O**: implemented & tested, *****: implemented, **X**: not implemented
-
 
 ## References
 
