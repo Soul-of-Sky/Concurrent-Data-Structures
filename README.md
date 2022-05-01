@@ -22,7 +22,9 @@ C language implementation of common concurrent data structure with memory reclam
 | concurrent b+tree                    |   X   |   X    |  X   |  X   |  X   |
 
 memory reclamation:
+
 **QSBR**: quiescent-state-based reclamation, **EBR**: epoch-based reclaimation, **HPBR**: hazard-pointer-based reclaimation
+
 **O**: implemented & tested, *****: implemented, **X**: not implemented
 
 
