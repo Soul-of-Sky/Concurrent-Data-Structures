@@ -10,12 +10,12 @@
 #include "pthread_barrier.h"
 #include "skiplist.h"
 
-#define N           100000
+#define N           1000000
 #define NUM_THREAD  12
 
-#define RAND
+// #define RAND
 // #define DETAIL
-// #define ASSERT
+#define ASSERT
 
 #ifdef DETAIL
 #define test_print(fmt, args ...) do{printf(fmt, ##args);}while(0)

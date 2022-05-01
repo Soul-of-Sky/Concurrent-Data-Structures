@@ -55,7 +55,7 @@ void sl_destroy(struct sl* sl) {
     
     pred = sl->head;
     while(pred) {
-        curr = GET_NODE(pred->next);
+        curr = GET_NODE(pred->next[0]);
         free_node(pred);
         pred = curr;
     }
@@ -108,7 +108,7 @@ int sl_insert(struct sl* sl, ukey_t k, uval_t v) {
     struct sl_node* preds[max_levels];
     struct sl_node* succs[max_levels];
     struct sl_node *pred, *succ, *node;
-    int found_level, lock_level, all_locked;
+    int found_level, locked_level, all_locked;
     int node_levels;
     int i;
     
@@ -125,7 +125,7 @@ retry:
         }
     }
 
-    lock_level = -1;
+    locked_level = -1;
     all_locked = 1;
     for (i = 0; i < node_levels; i++) {
         pred = preds[i];
@@ -133,7 +133,7 @@ retry:
         if (i == 0 || preds[i - 1] != pred) {
             spin_lock(&pred->lock);
         }
-        lock_level = i;
+        locked_level = i;
         if (IS_MARKED(pred) || IS_MARKED(succ) || GET_NODE(pred->next[i]) != succ) {
             all_locked = 0;
             break;
@@ -141,7 +141,7 @@ retry:
     }
     
     if (!all_locked) {
-        for (i = 0; i < lock_level; i++) {
+        for (i = 0; i <= locked_level; i++) {
             pred = preds[i];
             if (i == 0 || preds[i - 1] != pred) {
                 spin_unlock(&pred->lock);
@@ -160,7 +160,7 @@ retry:
     }
     GET_SIGN(node) = FULLY_LINK(node);
 
-    for (i = 0; i < lock_level; i++) {
+    for (i = 0; i <= locked_level; i++) {
         pred = preds[i];
         if (i == 0 || preds[i - 1] != pred) {
             spin_unlock(&pred->lock);
@@ -193,7 +193,7 @@ int sl_remove(struct sl* sl, ukey_t k) {
     struct sl_node* preds[max_levels];
     struct sl_node* succs[max_levels];
     struct sl_node *pred, *succ, *node;
-    int found_level, lock_level, node_levels;
+    int found_level, locked_level, node_levels;
     int is_marked = 0, all_locked, i;
 
 retry:
@@ -213,8 +213,8 @@ retry:
         GET_SIGN(node) = MARK_NODE(node);
         is_marked = 1;
     }
-    
-    lock_level = -1;
+
+    locked_level = -1;
     all_locked = 1;
     for (i = 0; i < node_levels; i++) {
         pred = preds[i];
@@ -222,15 +222,16 @@ retry:
         if (i == 0 || preds[i - 1] != pred) {
             spin_lock(&pred->lock);
         }
-        lock_level = i;
-        if (IS_MARKED(pred) || IS_MARKED(succ) || GET_NODE(pred->next[i]) != succ) {
+        locked_level = i;
+        if (IS_MARKED(pred) || GET_NODE(pred->next[i]) != succ) {
             all_locked = 0;
             break;
         }
     }
     
     if (!all_locked) {
-        for (i = 0; i < lock_level; i++) {
+        spin_unlock(&node->lock);
+        for (i = 0; i <= locked_level; i++) {
             pred = preds[i];
             if (i == 0 || preds[i - 1] != pred) {
                 spin_unlock(&pred->lock);
@@ -245,7 +246,7 @@ retry:
     }
 
     spin_unlock(&node->lock);
-    for (i = 0; i < lock_level; i++) {
+    for (i = 0; i <= locked_level; i++) {
         pred = preds[i];
         if (i == 0 || preds[i - 1] != pred) {
             spin_unlock(&pred->lock);
