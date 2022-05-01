@@ -1,7 +1,7 @@
 CC = gcc
 CFLAGS = -g -O2 -I ../include
 LDFLAGS = -lpthread
-RM = rm
+RM = rm -f
 
 all: lazy_sync_test lock_free_test
 

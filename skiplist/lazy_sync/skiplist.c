@@ -112,7 +112,7 @@ int sl_insert(struct sl* sl, ukey_t k, uval_t v) {
     int node_levels;
     int i;
     
-    node_levels = get_random_levels();
+    node_levels = get_rand_levels(sl);
 
 retry:
     found_level = find(sl, k, preds, succs);
