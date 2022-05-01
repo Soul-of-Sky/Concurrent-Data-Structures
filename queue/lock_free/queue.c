@@ -26,7 +26,7 @@ struct queue* q_init() {
 }
 
 static void free_node(struct q_node* node) {
-    free(node);
+    // free(node);
 }
 
 void q_destroy(struct queue* q) {
@@ -81,6 +81,7 @@ int q_pop(struct queue* q, uval_t* v) {
             } else {
                 *v = next->v;
                 if (cmpxchg2(&q->head, first, next)) {
+                    free_node(first);
                     return 0;
                 }
             }
