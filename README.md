@@ -7,9 +7,14 @@ C language implementation of common concurrent data structure(Using hazard point
 ## Content
 
 * linked list
-  * lazy synchronization
+  * lazy synchronization  
   * lock-free
-  
+* queue
+  * blocking queue (producer-consumer queue)
+  * lazy synchronization
+
+## Schedule
+
 ## References
 
 The art of multiprocessor programming (revised reprint)

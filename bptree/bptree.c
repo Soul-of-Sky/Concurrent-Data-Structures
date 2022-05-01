@@ -11,7 +11,7 @@
 #include "list.h"
 #include "bptree.h"
 
-#if 1
+#if 0
 #define BP_ASSERT(x) assert(x)
 #else
 #define BP_ASSERT(x) do{}while(0)
