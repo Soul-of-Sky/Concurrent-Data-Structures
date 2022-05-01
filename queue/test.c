@@ -10,7 +10,7 @@
 #include "pthread_barrier.h"
 #include "queue.h"
 
-#define N           100000
+#define N           1000000
 #define NUM_THREAD  4
 
 #define POOL_SIZE   100
