@@ -1,7 +1,8 @@
 stack
 bptree
-test skiplist
 
 add 3 gcs
 add notes
 add asserts
+
+fix warnings

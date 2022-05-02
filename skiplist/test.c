@@ -11,11 +11,11 @@
 #include "skiplist.h"
 
 #define N           1000000
-#define NUM_THREAD  12
+#define NUM_THREAD  4
 
 // #define RAND
 // #define DETAIL
-#define ASSERT
+// #define ASSERT
 
 #ifdef DETAIL
 #define test_print(fmt, args ...) do{printf(fmt, ##args);}while(0)

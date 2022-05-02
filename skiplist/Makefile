@@ -3,7 +3,7 @@ CFLAGS = -g -O0 -I ../include
 LDFLAGS = -lpthread
 RM = rm -f
 
-all: lazy_sync_test #lock_free_test
+all: lazy_sync_test lock_free_test
 
 lazy_sync_test: lazy_sync/skiplist.c test.c
 	$(CC) $^ $(CFLAGS) -I lazy_sync $(LDFLAGS) -o $@

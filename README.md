@@ -18,7 +18,7 @@ C language implementation of common concurrent data structure with memory reclam
 | cuckoo hashset                       |   X   |   X    |  X   |  X   |  X   |
 | concurrent heap                      |   X   |   X    |  X   |  X   |  X   |
 | lazy-sync skiplist                   |   O   |   O    |  X   |  X   |  X   |
-| lock-free skiplist                   |   X   |   X    |  X   |  X   |  X   |
+| lock-free skiplist                   |   O   |   O    |  X   |  X   |  X   |
 | concurrent b+tree                    |   X   |   X    |  X   |  X   |  X   |
 
 memory reclamation:
