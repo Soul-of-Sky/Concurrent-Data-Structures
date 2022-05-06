@@ -3,11 +3,11 @@ CFLAGS = -g -O2 -I ../include
 LDFLAGS = -lpthread
 RM = rm -f
 
-all: stack_test
+all: concurrent_heap_test
 
-stack_test: stack.c test.c
+concurrent_heap_test: heap.c test.c
 	$(CC) $^ $(CFLAGS) $(LDFLAGS) -o $@
 
 clean:
-	$(RM) stack_test
+	$(RM) concurrent_heap_test
 	$(RM) *.o

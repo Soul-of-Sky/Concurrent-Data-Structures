@@ -2,24 +2,27 @@
 
 ## Introduction
 
-C language implementation of common concurrent data structure with memory reclamation
+C language implementation of common concurrent data structures with multiple memory reclamations
 
 ## Schedule
 
 |                                      | BUILD | TESTED | QSBR | EBR  | HPBR |
 | ------------------------------------ | :---: | :----: | :--: | :--: | :--: |
+| QSBR                                 |   X   |   X    |  --  |  --  |  --  |
+| EBR                                  |   X   |   X    |  --  |  --  |  --  |
+| HPBR                                 |   X   |   X    |  --  |  --  |  --  |
 | lazy-sync linked list                |   O   |   O    |  X   |  X   |  X   |
 | lock-free linked list                |   O   |   O    |  X   |  X   |  X   |
 | producer-consumer queue              |   O   |   O    |  X   |  X   |  X   |
 | lazy-sync queue                      |   O   |   O    |  X   |  X   |  X   |
-| lock-free stack                      |   X   |   X    |  X   |  X   |  X   |
+| lock-free back-off stack             |   O   |   O    |  X   |  X   |  X   |
 | lock-free elimination back-off stack |   X   |   X    |  X   |  X   |  X   |
 | lock-free hashset                    |   X   |   X    |  X   |  X   |  X   |
 | cuckoo hashset                       |   X   |   X    |  X   |  X   |  X   |
-| concurrent heap                      |   X   |   X    |  X   |  X   |  X   |
+| concurrent heap                      |   O   |   X    |  X   |  X   |  X   |
 | lazy-sync skiplist                   |   O   |   O    |  X   |  X   |  X   |
 | lock-free skiplist                   |   O   |   O    |  X   |  X   |  X   |
-| concurrent b+tree                    |   X   |   X    |  X   |  X   |  X   |
+| concurrent b+tree                    |   X   |   X    |  --  |  --  |  --  |
 
 memory reclamation:
 

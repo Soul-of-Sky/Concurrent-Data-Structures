@@ -1,8 +1,8 @@
-stack
-bptree
+pools test all use one barrier!!!
 
 add 3 gcs
 add notes
 add asserts
 
 fix warnings
+maybe remove static global vals

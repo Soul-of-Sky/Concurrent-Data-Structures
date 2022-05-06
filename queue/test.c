@@ -7,7 +7,9 @@
 #include <assert.h>
 #include <errno.h>
 
+#ifdef __APPLE__
 #include "pthread_barrier.h"
+#endif
 #include "queue.h"
 
 #define N           1000000

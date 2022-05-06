@@ -6,23 +6,30 @@
 
 #include "rwlock.h"
 #include "util.h"
+#include "list.h"
 
 typedef entry_t bp_kv_t;
 
-enum page_type {
-    INTER = 0,
-    LEAF
-};
+#define BP_ADD      100
+#define BP_DEL      101
+#define BP_READ     102
+#define BP_WRITE    103
+
+#define BP_INTER    200
+#define BP_LEAF     201
 
 struct page {
-    enum page_type type;
+    int type;
+    int is_head;
     int length;
     rwlock_t lock;
+    struct list_head list;
 
     bp_kv_t kv[0];
 };
 
 struct bp {
+    int page_size;
     rwlock_t lock;
     struct page* head;
 };
