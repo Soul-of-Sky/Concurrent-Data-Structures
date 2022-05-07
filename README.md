@@ -19,7 +19,7 @@ C language implementation of common concurrent data structures with multiple mem
 | lock-free elimination back-off stack |   X   |   X    |  X   |  X   |  X   |
 | lock-free hashset                    |   X   |   X    |  X   |  X   |  X   |
 | cuckoo hashset                       |   X   |   X    |  X   |  X   |  X   |
-| concurrent heap                      |   O   |   X    |  X   |  X   |  X   |
+| concurrent heap                      |   O   |   O    |  X   |  X   |  X   |
 | lazy-sync skiplist                   |   O   |   O    |  X   |  X   |  X   |
 | lock-free skiplist                   |   O   |   O    |  X   |  X   |  X   |
 | concurrent b+tree                    |   X   |   X    |  --  |  --  |  --  |

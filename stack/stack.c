@@ -53,7 +53,9 @@ static int try_push(struct stack* s, struct s_node* node) {
 
 /* backoff can alleviate contention in a high contention situation */
 static inline void backoff() {
+#ifdef BACKOFF
     usleep(100);
+#endif
 }
 
 extern void s_push(struct stack* s, uval_t v) {

@@ -13,9 +13,10 @@
 #include "queue.h"
 
 #define N           1000000
+/*NUM_THREAD HAS TO BE AN ODD*/
 #define NUM_THREAD  4
 
-#define POOL_SIZE   100
+#define POOL_SIZE   10000
 
 #define RAND
 // #define DETAIL
@@ -37,8 +38,7 @@ __thread struct timeval t0, t1;
 __thread uval_t v_arr[N];
 
 pthread_barrier_t barrier;
-pthread_t tids1[NUM_THREAD];
-pthread_t tids2[NUM_THREAD];
+pthread_t tids[NUM_THREAD];
 
 ukey_t k[N];
 uval_t v[N];
@@ -129,7 +129,7 @@ void* push_fun(void* arg) {
 
     do_push(id, -1);
 
-    do_barrier(id, "PUSH");
+    do_barrier(id, "PUSH & POP");
 }
 
 void* pop_fun(void* arg) {
@@ -137,7 +137,7 @@ void* pop_fun(void* arg) {
 
     do_pop(id, -1);
 
-    do_barrier(id, "POP");
+    do_barrier(id, "PUSH & POP");
 }
 
 int main() {
@@ -149,14 +149,13 @@ int main() {
     
     pthread_barrier_init(&barrier, NULL, NUM_THREAD);
 
-    for (i = 0; i < NUM_THREAD; i++) {
-        pthread_create(&tids1[i], NULL, push_fun, (void*) i);
-        pthread_create(&tids2[i], NULL, pop_fun, (void*) i);
+    for (i = 0; i < NUM_THREAD / 2; i++) {
+        pthread_create(&tids[i], NULL, push_fun, (void*) i);
+        pthread_create(&tids[NUM_THREAD / 2 + i], NULL, pop_fun, (void*) (NUM_THREAD / 2 + i));
     }
 
     for (i = 0; i < NUM_THREAD; i++) {
-        pthread_join(tids1[i], NULL);
-        pthread_join(tids2[i], NULL);
+        pthread_join(tids[i], NULL);
     }
 
     q_destroy(q);

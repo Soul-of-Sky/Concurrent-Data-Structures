@@ -121,17 +121,18 @@ extern int h_pop(struct heap* h, ukey_t *k) {
     nodes[0].tid = -1;
     h_swap(&nodes[0], &nodes[last]);
     spin_unlock(&nodes[last].lock);
+    assert(nodes[0].tag != EMPTY);
     
     /*node[0] is still locked*/
     now = 0;
-    while(now < (h->len - 2) / 2) {
+    while(now * 2 + 2 < h->len) {
         left = now * 2 + 1;
         right = now * 2 + 2;
         spin_lock(&nodes[left].lock);
         spin_lock(&nodes[right].lock);
         if (nodes[left].tag == EMPTY) {
-            spin_lock(&nodes[left].lock);
-            spin_lock(&nodes[right].lock);
+            spin_unlock(&nodes[left].lock);
+            spin_unlock(&nodes[right].lock);
             break;
         } else if (nodes[right].tag == EMPTY || 
         k_cmp(nodes[left].k, nodes[right].k) < 0) {
@@ -163,5 +164,6 @@ extern int h_top(struct heap* h, ukey_t *k) {
         return -ENONET;
     }
     *k = h->nodes[0].k;
+    spin_unlock(&h->lock);
     return 0;
 }
