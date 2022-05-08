@@ -1,3 +1,6 @@
+lock-free hashset:
+    init add args(max_num_cluster)
+
 heap: 
     ukey_t -> entry_t
 
