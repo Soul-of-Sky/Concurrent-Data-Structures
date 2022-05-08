@@ -17,8 +17,8 @@ C language implementation of common concurrent data structures with multiple mem
 | lazy-sync queue                      |   O   |   O    |  X   |  X   |  X   |
 | lock-free back-off stack             |   O   |   O    |  X   |  X   |  X   |
 | lock-free elimination back-off stack |   X   |   X    |  X   |  X   |  X   |
-| lock-free hashset                    |   X   |   X    |  X   |  X   |  X   |
-| cuckoo hashset                       |   X   |   X    |  X   |  X   |  X   |
+| lock-free hashset                    |   O   |   O    |  X   |  X   |  X   |
+| concurrent cuckoo hashset            |   X   |   X    |  X   |  X   |  X   |
 | concurrent heap                      |   O   |   O    |  X   |  X   |  X   |
 | lazy-sync skiplist                   |   O   |   O    |  X   |  X   |  X   |
 | lock-free skiplist                   |   O   |   O    |  X   |  X   |  X   |
@@ -32,6 +32,8 @@ memory reclamation:
 ## References
 
 The art of multiprocessor programming
+
+O. Shalev and N. Shavit. Split-ordered lists: lock-free extensible hash tables
 
 P. E. McKenney and J. D. Slingwine. Read-copy update: Using execution history to solve concurrency problems
 

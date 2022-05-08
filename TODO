@@ -1,12 +1,15 @@
-pools test all use one barrier!!!
+heap: 
+    ukey_t -> entry_t
 
 add 3 gcs
 add notes
 add asserts
 
-test.c: define -> avgs
+test.c: 
+    define -> avgs
     num_threads
     n
 add Makefile.inc
 fix warnings
+change init maybe
 maybe remove static global vals

@@ -8,12 +8,6 @@
 
 #include "linked_list.h"
 
-static int k_cmp(ukey_t a, ukey_t b) {
-    if (a < b) return -1;
-    if (a > b) return 1;
-    return 0;
-}
-
 static struct ll_node* malloc_node(ukey_t k, uval_t v) {
     struct ll_node* node = (struct ll_node*) malloc(sizeof(struct ll_node));
 

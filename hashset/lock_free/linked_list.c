@@ -97,6 +97,24 @@ retry:
     }
 }
 
+extern int ll_insert2(struct ll* ll, struct ll_node* node) {
+    struct ll_node *pred, *curr;
+    ukey_t k = node->e.k;
+retry:
+    find(ll, k, &pred, &curr);
+
+    if (k_cmp(curr->e.k, k) == 0) {
+        return -EEXIST;
+    } else {
+        node->next = curr;
+        
+        if (!cmpxchg2(&pred->next, curr, node)) {
+            goto retry;
+        }
+        return 0;
+    }
+}
+
 int ll_lookup(struct ll* ll, ukey_t k, uval_t* v) {
     struct ll_node *curr = GET_NODE(ll->head->next);
 

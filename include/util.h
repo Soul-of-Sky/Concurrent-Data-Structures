@@ -17,4 +17,8 @@ static int k_cmp(ukey_t a, ukey_t b) {
     if (a < b) return -1;
     return 0;
 }
+
+#define likely(x)   __builtin_expect(!!(x), 1)
+#define unlikely(x) __builtin_expect(!!(x), 0)
+
 #endif
