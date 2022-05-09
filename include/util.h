@@ -21,4 +21,7 @@ static int k_cmp(ukey_t a, ukey_t b) {
 #define likely(x)   __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
+#define MAX_NUM_THREADS     32
+#define MAX_N               10000000
+
 #endif

@@ -49,8 +49,8 @@ static void gen_data() {
     int i;
 
     for (i = 0; i < N; i++) {
-        k[i] = i;
-        v[i] = i;
+        k[i] = i + 1;
+        v[i] = i + 1;
     }
 
 #ifdef RAND

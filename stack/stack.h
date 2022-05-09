@@ -3,8 +3,6 @@
 
 #include "util.h"
 
-#define BACKOFF
-
 struct s_node {
     uval_t v;
     struct s_node* next;

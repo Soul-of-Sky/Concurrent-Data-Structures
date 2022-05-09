@@ -10,31 +10,37 @@
 
 typedef entry_t bp_kv_t;
 
-#define BP_ADD      100
-#define BP_DEL      101
-#define BP_READ     102
-#define BP_WRITE    103
+#define BP_READ     0x100
+#define BP_ADD      0x101
+#define BP_DEL      0x102
 
-#define BP_INTER    200
-#define BP_LEAF     201
+#define BP_INTER    0x200
+#define BP_LEAF     0x201
 
 struct page {
     int type;
-    int is_head;
     int length;
     rwlock_t lock;
-    struct list_head list;
+    
+    /* crabbing lock will use these*/
+    int locked;
+    struct page* fa;
+
+    /* leaf use only*/
+    struct page* next;
 
     bp_kv_t kv[0];
 };
 
 struct bp {
-    int page_size;
+    int degree;
     rwlock_t lock;
-    struct page* head;
+    struct page* root;
+    
+    int locked;
 };
 
-extern struct bp* bp_init(unsigned int page_size);
+extern struct bp* bp_init(unsigned int degree);
 extern void bp_destroy(struct bp* bp);
 extern int bp_insert(struct bp* bp, ukey_t k, uval_t v);
 extern int bp_lookup(struct bp* bp, ukey_t k, uval_t* v);

@@ -16,12 +16,12 @@ C language implementation of common concurrent data structures with multiple mem
 | producer-consumer queue              |   O   |   O    |  X   |  X   |  X   |
 | lazy-sync queue                      |   O   |   O    |  X   |  X   |  X   |
 | lock-free back-off stack             |   O   |   O    |  X   |  X   |  X   |
-| lock-free elimination back-off stack |   X   |   X    |  X   |  X   |  X   |
+| lock-free elimination back-off stack |   O   |   O    |  X   |  X   |  X   |
 | lock-free hashset                    |   O   |   O    |  X   |  X   |  X   |
 | concurrent heap                      |   O   |   O    |  X   |  X   |  X   |
 | lazy-sync skiplist                   |   O   |   O    |  X   |  X   |  X   |
 | lock-free skiplist                   |   O   |   O    |  X   |  X   |  X   |
-| concurrent b+tree                    |   X   |   X    |  --  |  --  |  --  |
+| concurrent b+tree                    |   O   |   X    |  --  |  --  |  --  |
 
 memory reclamation:
 

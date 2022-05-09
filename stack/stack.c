@@ -8,6 +8,16 @@
 #include "eliminator.h"
 #include "atomic.h"
 
+#define BACKOFF
+#define BACKOFF_USECS   100
+
+#define ELIMINATION
+#define TIMEOUT_USECS   10
+#define PREDICT_NUM_THEADS  4
+
+int el_push_cnt = 0;
+int el_pop_cnt = 0;
+
 #define STACK_EMPTY ((void*) 0x1234567)
 
 static struct s_node* alloc_node(uval_t v) {
@@ -40,6 +50,7 @@ extern void s_destroy(struct stack* s) {
         free_node(pred);
     }
 
+    // printf("el_cnt: %d %d\n", el_pop_cnt, el_pop_cnt);
     free(s);
 }
 
@@ -53,19 +64,30 @@ static int try_push(struct stack* s, struct s_node* node) {
 
 /* backoff can alleviate contention in a high contention situation */
 static inline void backoff() {
-#ifdef BACKOFF
-    usleep(100);
-#endif
+    usleep(BACKOFF_USECS);
 }
 
 extern void s_push(struct stack* s, uval_t v) {
     struct s_node* node = alloc_node(v);
+    uint64_t ex_v;
 
     while(1) {
         if (try_push(s, node)) {
             return;
         } else {
+#ifdef ELIMINATION
+            exchang2(&_el, PREDICT_NUM_THEADS, (uint64_t) node, TIMEOUT_USECS, &ex_v);
+            if (ex_v == 0) {
+                // printf("PUSH exchange succeed\n");
+                xadd(&el_push_cnt, 1);
+                /* the exchanger will free it for us */
+                return;
+            }
+#else
+#ifdef BACKOFF
             backoff();
+#endif
+#endif
         }
     }
 }
@@ -80,7 +102,6 @@ static struct s_node* try_pop(struct stack* s) {
 
     new_top = old_top->next;
     if (cmpxchg2(&s->head, old_top, new_top)) {
-        //TODO: free node
         return old_top;
     }
 
@@ -89,15 +110,30 @@ static struct s_node* try_pop(struct stack* s) {
 
 extern int s_pop(struct stack* s, uval_t* v) {
     struct s_node* top;
+    uint64_t ex_v;
 
     while(1) {
         top = try_pop(s);
         if (top == STACK_EMPTY) {
             return -ENOENT;
         } else if (top == NULL) {
+#ifdef ELIMINATION
+            exchang2(&_el, PREDICT_NUM_THEADS, 0UL, TIMEOUT_USECS, &ex_v);
+            if (ex_v != 0) {
+                *v = ((struct s_node*) ex_v)->v;
+                xadd(&el_pop_cnt, 1);
+                // printf("POP exchange succeed\n");
+                //TODO: free node
+                return 0;
+            }
+#else
+#ifdef BACKOFF
             backoff();
+#endif
+#endif
         } else {
             *v = top->v;
+            //TODO: free node
             return 0;
         }
     }
