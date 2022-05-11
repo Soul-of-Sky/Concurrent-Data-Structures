@@ -145,7 +145,7 @@ int main() {
 
     gen_data();
 
-    h = h_init(POOL_SIZE);
+    h = h_create(POOL_SIZE);
     
     pthread_barrier_init(&barrier, NULL, NUM_THREAD);
 

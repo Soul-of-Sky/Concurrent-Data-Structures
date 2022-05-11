@@ -15,7 +15,7 @@ struct queue {
     struct q_node *head, *tail;
 };
 
-extern struct queue* q_init();
+extern struct queue* q_create();
 extern void q_destroy(struct queue* q);
 extern void q_push(struct queue* q, uval_t v);
 extern int q_pop(struct queue* q, uval_t* v);

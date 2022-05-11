@@ -186,7 +186,7 @@ int main() {
 
     gen_data();
 
-    sl = sl_init(30);
+    sl = sl_create(30);
     
     pthread_barrier_init(&barrier, NULL, NUM_THREAD);
 

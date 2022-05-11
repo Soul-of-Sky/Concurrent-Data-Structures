@@ -12,7 +12,7 @@ struct stack {
     struct s_node* head;
 };
 
-extern struct stack* s_init();
+extern struct stack* s_create();
 extern void s_destroy(struct stack* s);
 extern void s_push(struct stack* s, uval_t v);
 extern int s_pop(struct stack* s, uval_t* v);

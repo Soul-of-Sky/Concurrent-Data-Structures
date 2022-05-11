@@ -21,7 +21,7 @@ struct hash_set {
     int num_e;
 };
 
-extern struct hash_set* hs_init();
+extern struct hash_set* hs_create();
 extern void hs_destroy(struct hash_set* hs);
 extern int hs_insert(struct hash_set* hs, ukey_t k, uval_t v);
 extern int hs_lookup(struct hash_set* hs, ukey_t k, uval_t* v);

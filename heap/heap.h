@@ -25,7 +25,7 @@ struct heap {
     struct h_node nodes[0];
 };
 
-extern struct heap* h_init(int size);
+extern struct heap* h_create(int size);
 extern void h_destroy(struct heap* h);
 extern int h_push(struct heap* h, ukey_t k, int tid);
 extern int h_pop(struct heap* h, ukey_t *k);

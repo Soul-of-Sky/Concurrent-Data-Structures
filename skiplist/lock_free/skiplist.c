@@ -22,7 +22,7 @@ static struct sl_node* alloc_node(int levels, ukey_t k, uval_t v) {
     return node;
 }
 
-struct sl* sl_init(int max_levels) {
+struct sl* sl_create(int max_levels) {
     assert(max_levels > 0);
     srand(time(0));
 

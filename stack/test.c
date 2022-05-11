@@ -143,7 +143,7 @@ int main() {
 
     gen_data();
 
-    s = s_init();
+    s = s_create();
     
     pthread_barrier_init(&barrier, NULL, NUM_THREAD);
 

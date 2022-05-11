@@ -33,7 +33,7 @@ struct sl {
 
 #define GET_NODE(v)         ((struct ll_node*) DEL_TAG(v, 0x1))
 
-extern struct sl* sl_init(int max_levels);
+extern struct sl* sl_create(int max_levels);
 extern void sl_destroy(struct sl* sl);
 extern int sl_insert(struct sl* sl, ukey_t k, uval_t v);
 extern int sl_lookup(struct sl* sl, ukey_t k, uval_t* v);

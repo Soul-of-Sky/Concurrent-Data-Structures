@@ -15,7 +15,7 @@ static struct q_node* alloc_node(uval_t v) {
     return node;
 }
 
-struct queue* q_init() {
+struct queue* q_create() {
     struct queue* q = (struct queue*) malloc(sizeof(struct queue));
     struct q_node* node = alloc_node(0);
     

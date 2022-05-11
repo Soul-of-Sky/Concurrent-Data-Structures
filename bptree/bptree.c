@@ -24,6 +24,10 @@
 /* leaf node */
 /* <k0, v0>, <k1, v1>, <k2, v2> ... <kn, vn>*/
 
+#define MAX_DEPTH 50
+__thread rwlock_t* lock_trace[MAX_DEPTH];
+__thread int lt_head, lt_tail;
+
 static struct page* alloc_page(struct bp* bp, int type) {
     int is_inter = (type == BP_INTER) ? 1 : 0;
     int size = sizeof(struct page) + (bp->degree + is_inter)* sizeof(bp_kv_t);
@@ -34,21 +38,18 @@ static struct page* alloc_page(struct bp* bp, int type) {
     page->kv[0].k = 0;
     rwlock_init(&page->lock);
 
-    page->locked = 0;
-    page->fa = NULL;
-
-    page->next = NULL;
-
     return page;
 }
 
-extern struct bp* bp_init(unsigned int degree) {
+extern struct bp* bp_create(unsigned int degree) {
     struct bp* bp = (struct bp*) malloc(sizeof(struct bp));
 
     bp->degree = degree;
     bp->root = alloc_page(bp, BP_LEAF);
-    bp->locked = 0;
-    rwlock_init(&bp->lock);
+    rwlock_init(&bp->root_lock);
+    rwlock_init(&bp->list_lock);
+    INIT_LIST_HEAD(&bp->leaf_list);
+    list_add(&bp->root->list, &bp->leaf_list);
 
     return bp;
 }
@@ -123,52 +124,44 @@ static void crabbing_lock(struct page* page, int op) {
     } else {
         write_lock(&page->lock);
     }
-    page->locked = 1;
+    lock_trace[lt_tail++] = &page->lock;
 }
 
-static void unlock_page(struct bp* bp, struct page* page, int op) {
-    if (likely(page)) {
-        if (!page->locked) {
-            return;
-        }
-        if (op == BP_READ) {
-            read_unlock(&page->lock);
-        } else {
-            write_unlock(&page->lock);
-        }
-        page->locked = 0;
-    } else {
-        if (!bp->locked) {
-            return;
-        }
-        if (op == BP_READ) {
-            read_unlock(&bp->lock);
-        } else {
-            write_unlock(&bp->lock);
-        }
-        bp->locked = 0;
+static void op_r_unlock() {
+    read_unlock(lock_trace[lt_head++]);
+    assert(lt_head == lt_tail - 1);
+}
+
+static void op_w_unlock() {
+    for (; lt_head < lt_tail - 1; lt_head++) {
+        write_unlock(lock_trace[lt_head]);
     }
 }
 
-static void unlock_recurse(struct bp* bp, struct page* page, int op) {
-    unlock_page(bp, page, op);
-    if (likely(page)) {
-        unlock_recurse(bp, page->fa, op);
-    }
-}
-
-static void crabbing_unlock(struct bp* bp, struct page* page, int op) {
+static void crabbing_unlock(int op) {
     if (op == BP_READ) {
-        unlock_page(bp ,page->fa, op);
+        op_r_unlock();
     } else {
-        unlock_recurse(bp, page->fa, op);
+        op_w_unlock();
+    }
+}
+
+static void unlock_all(int op) {
+    if (op == BP_READ) {
+        for (; lt_head < lt_tail; lt_head++) {
+            read_unlock(lock_trace[lt_head]);
+        }
+    } else {
+        for (; lt_head < lt_tail; lt_head++) {
+            write_unlock(lock_trace[lt_head]);
+        }
     }
 }
 
 static struct page* get_page(struct bp* bp, struct page* page, int op) {
     crabbing_lock(page, op);
     if (is_safe(bp, page, op)) {
-        crabbing_unlock(bp, page, op);
+        crabbing_unlock(op);
     }
 
     return page;
@@ -179,13 +172,17 @@ static struct page* get_page(struct bp* bp, struct page* page, int op) {
 static struct page* get_bp_root(struct bp* bp, int op) {
     struct page* root;
 
+    lt_head = 0;
+    lt_tail = 0;
+
     if (op == BP_READ) {
-        read_lock(&bp->lock);
+        read_lock(&bp->root_lock);
     } else {
-        write_lock(&bp->lock);
+        write_lock(&bp->root_lock);
     }
-    bp->locked = 1;
+    lock_trace[lt_tail++] = &bp->root_lock;
     root = bp->root;
+    get_page(bp, root, op);
 
     return root;
 }
@@ -215,7 +212,6 @@ static void page_insert(struct page* fa_page, struct page* new_page) {
     if (fa_page->length == 0) {
         fa_page->kv[0].v = (uval_t) new_page;
         fa_page->length++;
-        new_page->fa = fa_page;
         return;
     }
     
@@ -229,34 +225,35 @@ static void page_insert(struct page* fa_page, struct page* new_page) {
     fa_page->kv[idx + 1].k = k;
     fa_page->kv[idx + 1].v = (uval_t) new_page;
     fa_page->length++;
-    new_page->fa = fa_page;
 }
 
-static struct page* split(struct bp* bp, struct page* page) {
+static struct page* split(struct bp* bp, struct page* page, int lt_idx) {
     struct page* new_page = alloc_page(bp, page->type);
     struct page *fa_page, *new_fa_page;
-
+    int length;
     int i;
     int first_idx = (page->type == BP_INTER) ? 1 : 0;
 
+    length = (page->length - first_idx) / 2;
     /*copy the right half to the new page*/
-    for (i = page->length / 2; i < page->length; i++) {
-        memcpy(&new_page->kv[i - page->length / 2 + first_idx], &page->kv[i], sizeof(bp_kv_t));
+    for (i = page->length - length; i < page->length; i++) {
+        memcpy(&new_page->kv[i - (page->length - length) + first_idx], &page->kv[i], sizeof(bp_kv_t));
     }
-    new_page->length = page->length / 2;
-    
-    /*set next before change length, otherwise there will be omission when scan*/
-    if (page->type == BP_LEAF) {
-        page->next = new_page;
-    }
-    page->length -= page->length / 2;
-    /*the first key of INTER node is always zero*/
 
-    fa_page = page->fa;
-    if (fa_page) {
+    new_page->length = length + first_idx;
+    page->length -= length;
+
+    if (page->type == BP_LEAF) {
+        write_lock(&bp->list_lock);
+        list_add(&new_page->list, &page->list);
+        write_unlock(&bp->list_lock);
+    }
+
+    if (page != bp->root) {
         /* check if father page need to split*/
+        fa_page = container_of(lock_trace[lt_idx - 1], struct page, lock);
         if (fa_page->length == bp->degree + 1) {
-            new_fa_page = split(bp, fa_page);
+            new_fa_page = split(bp, fa_page, lt_idx - 1);
             /* choose the correct father page*/
             if (k_cmp(new_fa_page->kv[1].k, new_page->kv[first_idx].k) <= 0) {
                 fa_page = new_fa_page;
@@ -280,17 +277,17 @@ extern int bp_insert(struct bp* bp, ukey_t k, uval_t v) {
     int i;
 
     idx = find(bp, k, &leaf, BP_ADD);
-    assert(k_cmp(leaf->kv[idx].k, k) <= 0);
+    assert(idx == - 1 || k_cmp(leaf->kv[idx].k, k) <= 0);
 
     if (k_cmp(leaf->kv[idx].k, k) == 0) {
-        unlock_recurse(bp, leaf, BP_ADD);
+        unlock_all(BP_ADD);
         return -EEXIST;
     }
 
     org_leaf = leaf;
     if (leaf->length == bp->degree) {
-        new_leaf = split(bp, leaf);
-        /* choose the correct leaf*/
+        new_leaf = split(bp, leaf, lt_tail - 1);
+        /* choose the correct leaf */
         if (k_cmp(new_leaf->kv[0].k, k) <= 0) {
             leaf = new_leaf;
             idx = binary_search_in_page(leaf, k);
@@ -305,7 +302,7 @@ extern int bp_insert(struct bp* bp, ukey_t k, uval_t v) {
     leaf->kv[idx + 1].v = v;
     leaf->length++;
 
-    unlock_recurse(bp, org_leaf, BP_ADD);
+    unlock_all(BP_ADD);
 
     return 0;
 }
@@ -314,118 +311,120 @@ extern int bp_lookup(struct bp* bp, ukey_t k, uval_t* v) {
     struct page* leaf;
     int idx;
 
+    if (bp->root->length == 0) {
+        return -ENOENT;
+    }
+
     idx = find(bp, k, &leaf, BP_READ);
     assert(k_cmp(leaf->kv[idx].k, k) <= 0);
 
     if (k_cmp(leaf->kv[idx].k, k) == 0) {
         *v = leaf->kv[idx].v;
-        unlock_recurse(bp ,leaf, BP_READ);
+        unlock_all(BP_READ);
         return 0;
     }
 
-    unlock_recurse(bp ,leaf, BP_READ);
+    unlock_all(BP_READ);
 
     return -ENOENT;
 }
 
-static struct page* merge(struct bp* bp, struct page* page) {
-    struct page *fa_page, *sibling, *sb_child_page;
-    int idx, first_idx, i, is_left;
+static void merge(struct bp* bp, struct page* page, int lt_idx) {
+    struct page *fa_page, *sibling;
+    int idx, first_idx, i, is_left, length;
 
-    fa_page = page->fa;
-    if (fa_page == NULL) {
+    if (page == bp->root) {
+        if (page->length == 0) {
+            page->type = BP_LEAF;
+        }
         return;
     }
+
+    fa_page = container_of(lock_trace[lt_idx - 1], struct page, lock);
 
     first_idx = (page->type == BP_INTER) ? 1 : 0; 
     idx = binary_search_in_page(fa_page, page->kv[first_idx].k);
     
-    /* be aware that when merge INTER page, don't copy k[0](always 0) */
     if (idx + 1 < fa_page->length) {
-        /* right sibling */
+        /* always choose the right sibling, this is important because: */
+        /* 1. prevent deadlock whiling ranging and removing at the same time */
+        /* 2. k[0] is always the last key left in INTER node */
         sibling = (struct page*) fa_page->kv[idx + 1].v;
-        is_left = 0;
-    } else if (idx > 0) {
-        /* left sibling */
-        sibling = (struct page*) fa_page->kv[idx - 1].v;
-        is_left = 1;
-    } else if (page->length == 0 && page != bp->root) {
-        // for (i = fa_page->length; i > idx; i--) {
-        //     memcpy(&fa_page->kv[i], &fa_page->kv[i - 1], sizeof(bp_kv_t));
-        // }
-        // free_page(page);
-        // goto end;
-        /* not here */
+    } else if (page->length == 0) {
+        for (i = idx; i < fa_page->length - 1; i--) {
+            memcpy(&fa_page->kv[i], &fa_page->kv[i + 1], sizeof(bp_kv_t));
+        }
+        fa_page->length--;
+        
+        if (page != bp->root) {
+            if (page->type == BP_LEAF) {
+                write_lock(&bp->list_lock);
+                list_del(&page->list);
+                write_unlock(&bp->list_lock);
+            }
+            free_page(page);
+            /* remember to change the lock_trace after free*/
+            lt_tail--;
+        }
+
+        goto check_fa;
     } else {
-        return page;
+        return;
     }
 
     if (page->length + sibling->length - first_idx <= bp->degree) {
         /* merge */
+        /* be aware that when merge INTER page, don't copy k[0](always 0) */
+        /* copy the right sibling and free right sibling*/
         write_lock(&sibling->lock);
-        if (is_left) {
-            for (i = first_idx; i < page->length; i++) {
-                memcpy(&sibling->kv[sibling->length + i - first_idx], &page->kv[i], sizeof(bp_kv_t));
-            }
-        } else {
-            for (i = sibling->length - 1; i >= first_idx; i--) {
-                memcpy(&sibling->kv[i + sibling->length - first_idx], &sibling->kv[i], sizeof(bp_kv_t));
-            }
-            for (i = first_idx; i < page->length; i++) {
-                memcpy(&sibling->kv[i], &page->kv[i], sizeof(bp_kv_t));
-            }
+        length = sibling->length - first_idx;
+        for (i = first_idx; i < sibling->length; i++) {
+            memcpy(&page->kv[page->length + i - first_idx], &sibling->kv[i], sizeof(bp_kv_t));
         }
-        if (page->type == BP_INTER) {
-            for (i = first_idx; i < page->length; i++) {
-                ((struct page*) page->kv[i].v)->fa = sibling;
-            }
-        } 
-        sibling->length += page->length - first_idx;
-        
-        idx = binary_search_in_page(fa_page, page->kv[first_idx].k);
+        page->length += length;
 
-        for (i = fa_page->length; i > idx; i--) {
-            memcpy(&fa_page->kv[i], &fa_page->kv[i - 1], sizeof(bp_kv_t));
+        /* del from father page */
+        idx = binary_search_in_page(fa_page, sibling->kv[first_idx].k);
+        for (i = idx; i < fa_page->length - 1; i++) {
+            memcpy(&fa_page->kv[i], &fa_page->kv[i + 1], sizeof(bp_kv_t));
         }
-        
-        free_page(page);
-        page = sibling;
+        fa_page->length--;
+
+        /* delete in leaf list if it's leaf */
+        if (sibling->type == BP_LEAF) {
+            write_lock(&bp->list_lock);
+            list_del(&sibling->list);
+            write_unlock(&bp->list_lock);
+        }
+
+        /* free it */
+        free_page(sibling);
     } else {
         /*borrow one*/
         write_lock(&sibling->lock);
-        if (is_left) {
-            for (i = page->length; i > first_idx; i--) {
-                memcpy(&page->kv[i], &page->kv[i - 1], sizeof(bp_kv_t));
-            }
-            memcpy(&page->kv[first_idx], &sibling->kv[sibling->length - 1], sizeof(bp_kv_t));
-
-            sb_child_page = ((struct page*) sibling->kv[sibling->length - 1].v);
-            write_lock(&sb_child_page->lock);
-            sb_child_page->fa = page;
-            write_unlock(&sb_child_page->lock);
-        } else {
-            memcpy(&page->kv[page->length], &sibling->kv[first_idx], sizeof(bp_kv_t));
-
-            sb_child_page = ((struct page*) sibling->kv[first_idx].v);
-            write_lock(&sb_child_page->lock);
-            sb_child_page->fa = page;
-            write_unlock(&sb_child_page->lock);
-
-            for (i = first_idx; i < sibling->length - 1; i++) {
-                memcpy(&sibling->kv[i], &sibling->kv[i + 1], sizeof(bp_kv_t));
-            }
+        /* copy the min */
+        memcpy(&page->kv[page->length], &sibling->kv[first_idx], sizeof(bp_kv_t));
+        for (i = first_idx; i < sibling->length - 1; i++) {
+            memcpy(&sibling->kv[i], &sibling->kv[i + 1], sizeof(bp_kv_t));
         }
         page->length++;
         sibling->length--;
         write_unlock(&sibling->lock);
+        
+        /*change the key in father page*/
+        idx = binary_search_in_page(fa_page, sibling->kv[first_idx].k);
+        fa_page->kv[idx].k = sibling->kv[first_idx].k;
+
+        return;
     } 
 
-end:
+check_fa:
+    /* it must be a inter node */
     if (fa_page->length < (bp->degree + 1 - 1) / 2 + 1) {
-        merge(bp, fa_page);
+        merge(bp, fa_page, lt_idx - 1);
     }
 
-    return page;
+    return;
 }
 
 extern int bp_remove(struct bp* bp, ukey_t k) {
@@ -433,11 +432,15 @@ extern int bp_remove(struct bp* bp, ukey_t k) {
     int idx;
     int i;
 
+    if (bp->root->length == 0) {
+        return -ENOENT;
+    }
+    
     idx = find(bp, k, &leaf, BP_DEL);
     assert(k_cmp(leaf->kv[idx].k, k) <= 0);
 
     if (k_cmp(leaf->kv[idx].k, k) < 0) {
-        unlock_recurse(bp, leaf, BP_DEL);
+        unlock_all(BP_DEL);
         return -ENOENT;
     }
 
@@ -447,27 +450,55 @@ extern int bp_remove(struct bp* bp, ukey_t k) {
     leaf->length--;
 
     if (leaf->length < (bp->degree - 1) / 2 + 1) {
-        if (leaf->length == 0 && leaf->fa) {
-            unlock_recurse(bp, leaf->fa, BP_DEL);
-            free_page(leaf);
-            return 0;
-        } else {
-            leaf = merge(bp, leaf);
-        }
+        merge(bp, leaf, lt_tail - 1);
     }
 
-    unlock_recurse(bp, leaf, BP_DEL);
+    unlock_all(BP_DEL);
 
     return 0;
 }
 
 extern int bp_range(struct bp* bp, ukey_t k, unsigned int len, uval_t* v_arr) {
-    //TODO: link the leaf node
+    struct list_head *list;
+    struct page* page;
+    int cnt = 0, found = 0;
+    int i;
+
+    read_lock(&bp->list_lock);
+
+    list = &bp->leaf_list;
+    list_for_each_entry(page, list, list) {
+        i = 0;
+        read_lock(&page->lock);
+        if (found == 0) {
+            if (k_cmp(page->kv[page->length - 1].k, k) >= 0) {
+                for (; k_cmp(page->kv[i].k, k); i++);
+                found = 1;
+            } else {
+                read_unlock(&page->lock);
+                continue;
+            }
+        }
+        for (; i < page->length; i++) {
+            v_arr[cnt++] = page->kv[i].v;
+            if (cnt == len) {
+                read_unlock(&page->lock);
+                read_unlock(&bp->list_lock);
+                return cnt;
+            }
+        }
+        read_unlock(&page->lock);
+    }
+
+    read_unlock(&bp->list_lock);
+
+    return cnt;
 }
 
 static void print_page(char* prefix, int p_len, ukey_t anchor, struct page* page, int is_first) {
     int i;
-    char *__prefix;
+    char *__prefix = NULL;
+    struct page* child_page;
 
     printf("%s", prefix);
     printf(is_first ? "├──" : "└──");
@@ -478,21 +509,22 @@ static void print_page(char* prefix, int p_len, ukey_t anchor, struct page* page
     }
     if (page->type == BP_INTER) {
         for (i = 0; i < page->length; i++) {
-            __prefix = malloc(p_len + 4);
+            __prefix = malloc(p_len  + 10);
             strcpy(__prefix, prefix);
             strcat(__prefix, is_first ? "│   " : "    ");
-            print_page(__prefix, p_len + 4, page->kv[i].k, (struct page*) page->kv[i].v, i == 0);
+            child_page = (struct page*) page->kv[i].v;
+            print_page(__prefix, p_len  + 10, page->kv[i].k, child_page, i == 0);
         } 
     } else if (page->type == BP_LEAF) {
         for (i = 0; i < page->length; i++) {
-            __prefix = malloc(p_len + 4);
+            __prefix = malloc(p_len  + 10);
             strcpy(__prefix, prefix);
             strcat(__prefix, is_first ? "│   " : "    ");
-            print_page(__prefix, p_len + 4, page->kv[i].k, NULL, i == 0);
+            print_page(__prefix, p_len  + 10, page->kv[i].k, NULL, i == 0);
         } 
     }
 
-    free(__prefix);
+    if (__prefix) free(__prefix);
 }
 
 extern void bp_print(struct bp* bp) {

@@ -78,7 +78,7 @@ static struct bucket_list* get_bucket_list(struct hash_set* hs, int b_id) {
     /*init a new bucket list*/
     if (bucket == NULL) {
         bucket = (struct bucket_list*) malloc(sizeof(struct bucket_list));
-        bucket->bucket_head = ll_init();
+        bucket->bucket_head = ll_create();
         ll_insert(bucket->bucket_head, set_sentinel_key(b_id), NULL);
         cluster = hs->clusters[c_id];
         if (!cmpxchg2(&(buckets[c_b_id]), NULL, bucket)) {
@@ -114,7 +114,7 @@ static struct bucket_list* get_bucket_list2(struct hash_set* hs, int b_id) {
     return bucket;
 }
 
-extern struct hash_set* hs_init() {
+extern struct hash_set* hs_create() {
     struct hash_set* hs = (struct hash_set*) malloc(sizeof(struct hash_set));
     
     hs->num_e = 0;

@@ -14,7 +14,7 @@ struct queue {
     unsigned int used;
 };
 
-extern struct queue* q_init(unsigned int size);
+extern struct queue* q_create(unsigned int size);
 extern void q_destroy(struct queue* q);
 extern void q_push(struct queue* q, uval_t v);
 extern void q_pop(struct queue* q, uval_t* v);

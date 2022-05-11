@@ -19,7 +19,7 @@ static struct ll_node* malloc_node(ukey_t k, uval_t v) {
     return node;
 }
 
-struct ll* ll_init() {
+struct ll* ll_create() {
     struct ll* ll = (struct ll*) malloc(sizeof(struct ll));
     ukey_t max_k = UINT64_MAX;
 

@@ -16,7 +16,7 @@ static inline void h_swap(struct h_node* a, struct h_node* b) {
     memcpy(b, &t, size);
 }
 
-extern struct heap* h_init(int size) {
+extern struct heap* h_create(int size) {
     /*size to be an odd to prevent SEG_FAULT when access right child*/
     if (!(size & 1)) {
         size++;

@@ -28,7 +28,7 @@ static struct s_node* alloc_node(uval_t v) {
     return node;
 }
 
-extern struct stack* s_init() {
+extern struct stack* s_create() {
     struct stack* s = malloc(sizeof(struct stack));
 
     s->head = NULL;

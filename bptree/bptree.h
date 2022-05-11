@@ -21,26 +21,23 @@ struct page {
     int type;
     int length;
     rwlock_t lock;
-    
-    /* crabbing lock will use these*/
-    int locked;
-    struct page* fa;
 
     /* leaf use only*/
-    struct page* next;
+    struct list_head list;
 
     bp_kv_t kv[0];
 };
 
 struct bp {
     int degree;
-    rwlock_t lock;
+    rwlock_t root_lock;
     struct page* root;
-    
-    int locked;
+
+    rwlock_t list_lock;
+    struct list_head leaf_list;
 };
 
-extern struct bp* bp_init(unsigned int degree);
+extern struct bp* bp_create(unsigned int degree);
 extern void bp_destroy(struct bp* bp);
 extern int bp_insert(struct bp* bp, ukey_t k, uval_t v);
 extern int bp_lookup(struct bp* bp, ukey_t k, uval_t* v);

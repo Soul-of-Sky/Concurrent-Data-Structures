@@ -13,9 +13,9 @@
 #include "bptree.h"
 
 #define N           1000000
-#define NUM_THREAD  1
+#define NUM_THREAD  8
 
-// #define RAND
+#define RAND
 // #define DETAIL
 // #define ASSERT
 
@@ -129,6 +129,8 @@ static void do_remove(long id, int expect_ret) {
     for (i = st; i < ed; i++) {
         ret = bp_remove(bp, k[i]);
         test_assert(expect_ret == -1 || ret == expect_ret);
+        // printf("REMOVE %lu\n", k[i]);
+        // bp_print(bp);
     }
 
     interval = end_measure();
@@ -170,9 +172,9 @@ void* test(void* arg) {
 
     do_barrier(id, "LOOKUP");
 
-    // do_range(id);
+    do_range(id);
 
-    // do_barrier(id, "RANGE");
+    do_barrier(id, "RANGE");
 
     do_remove(id, 0);
 
@@ -188,7 +190,7 @@ int main() {
 
     gen_data();
 
-    bp = bp_init(32);
+    bp = bp_create(32);
     
     pthread_barrier_init(&barrier, NULL, NUM_THREAD);
 

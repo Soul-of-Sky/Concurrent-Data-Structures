@@ -6,7 +6,7 @@
 #include "atomic.h"
 #include "queue.h"
 
-struct queue* q_init(unsigned int size) {
+struct queue* q_create(unsigned int size) {
     struct queue* q = (struct queue*) malloc(sizeof(struct queue));
     
     q->buffer = (uval_t*) malloc(size * sizeof(uval_t));

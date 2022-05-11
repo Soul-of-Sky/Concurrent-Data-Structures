@@ -23,7 +23,7 @@ struct ll {
 #define REMOVE_MARK(v)      ((v) & ~0x1)
 #define GET_NODE(v)         ((struct ll_node*) REMOVE_MARK(v))
 
-extern struct ll* ll_init();
+extern struct ll* ll_create();
 extern void ll_destroy(struct ll* ll);
 extern int ll_insert(struct ll* ll, ukey_t k, uval_t v);
 extern int ll_insert2(struct ll* ll, struct ll_node* node);
