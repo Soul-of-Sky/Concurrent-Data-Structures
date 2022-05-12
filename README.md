@@ -8,9 +8,9 @@ C language implementation of common concurrent data structures with multiple mem
 
 |                                      | BUILD | TESTED | QSBR | EBR  | HPBR |
 | ------------------------------------ | :---: | :----: | :--: | :--: | :--: |
-| QSBR                                 |   O   |   X    |  --  |  --  |  --  |
-| EBR                                  |   O   |   X    |  --  |  --  |  --  |
-| HPBR                                 |   O   |   X    |  --  |  --  |  --  |
+| QSBR                                 |   O   |   O    |  --  |  --  |  --  |
+| EBR                                  |   O   |   O    |  --  |  --  |  --  |
+| HPBR                                 |   O   |   O    |  --  |  --  |  --  |
 | lazy-sync linked list                |   O   |   O    |  X   |  X   |  X   |
 | lock-free linked list                |   O   |   O    |  X   |  X   |  X   |
 | producer-consumer queue              |   O   |   O    |  X   |  X   |  X   |
