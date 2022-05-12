@@ -37,6 +37,7 @@ extern void hpbr_thread_unregister(struct hpbr* hpbr, int tid);
 extern void hpbr_hold(struct hpbr* hpbr, int index, int level, void* addr, int tid);
 extern void hpbr_release(struct hpbr* hpbr, int index, int level, int tid);
 extern void hpbr_release2(struct hpbr* hpbr, int index, int tid);
+extern void hpbr_release_all(struct hpbr* hpbr, int tid);
 extern void hpbr_retire(struct hpbr* hpbr, void* addr, int tid);
 extern void hpbr_try_gc(struct hpbr* hpbr);
 

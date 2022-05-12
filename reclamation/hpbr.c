@@ -71,6 +71,14 @@ extern void hpbr_release2(struct hpbr* hpbr, int index, int tid) {
     memset(hpbr->hp_nodes[tid].hps[index], 0, hpbr->hp_levels);
 }
 
+extern void hpbr_release_all(struct hpbr* hpbr, int tid) {
+    int i;
+    
+    for (i = 0; i < MAX_NUM_HPS_PER_THREAD; i++) {
+        memset(hpbr->hp_nodes[tid].hps[i], 0, hpbr->hp_levels);
+    }
+}
+
 extern void hpbr_retire(struct hpbr* hpbr, void* addr, int tid) {
     struct hp_node* hp_node = &hpbr->hp_nodes[tid];
     struct list_head* list = &hp_node->rt_list;
