@@ -26,7 +26,7 @@ extern struct qsbr* qsbr_create(free_fun_t _free) {
 static void gc_epoch_before(struct qsbr* qsbr, unsigned long epoch) {
     struct list_head* list;
     struct qs_node* qs_node;
-    struct rt_node *rt_node, *n;
+    struct qs_rt_node *rt_node, *n;
     int i;
 
     for (i = 0; i < MAX_NUM_THREADS; i++) {
@@ -55,12 +55,12 @@ extern void qsbr_thread_register(struct qsbr* qsbr, int tid) {
     qsbr->qs_nodes[tid].used = 1;
 }
 
-extern void qsbr_thread_exit(struct qsbr* qsbr, int tid) {
+extern void qsbr_thread_unregister(struct qsbr* qsbr, int tid) {
     qsbr->qs_nodes[tid].used = 0;
 }
 
 extern void qsbr_put(struct qsbr* qsbr, void* addr, int tid) {
-    struct rt_node* rt_node = (struct rt_node*) malloc(sizeof(struct rt_node));
+    struct qs_rt_node* rt_node = (struct qs_rt_node*) malloc(sizeof(struct qs_rt_node));
     struct qs_node* qs_node = &qsbr->qs_nodes[tid];
 
     rt_node->addr = addr;
@@ -85,6 +85,7 @@ extern void qsbr_try_gc(struct qsbr* qsbr) {
     pthread_mutex_lock(&qsbr->lock);
 
     if (rand() % GC_FRQ != 0) {
+        pthread_mutex_unlock(&qsbr->lock);
         return;
     }
 

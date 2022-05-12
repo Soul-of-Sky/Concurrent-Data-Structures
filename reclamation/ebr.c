@@ -26,7 +26,7 @@ extern struct ebr* ebr_create(free_fun_t _free) {
 
 static void gc_epoch(struct ebr* ebr, unsigned int epoch) {
     struct list_head* list = &ebr->rt_lists[epoch];
-    struct rt_node *rt_node, *n;
+    struct e_rt_node *rt_node, *n;
 
     list_for_each_entry_safe(rt_node, n, list, list) {
         ebr->_free(rt_node->addr);
@@ -47,7 +47,7 @@ extern void ebr_thread_register(struct ebr* ebr, int tid) {
     ebr->e_nodes[tid].used = 1;
 }
 
-extern void ebr_thread_exit(struct ebr* ebr, int tid) {
+extern void ebr_thread_unregister(struct ebr* ebr, int tid) {
     ebr->e_nodes[tid].used = 0;
 }
 
@@ -64,12 +64,12 @@ extern void ebr_exit(struct ebr* ebr, int tid) {
 }
 
 extern void ebr_put(struct ebr* ebr, void* addr, int tid) {
-    struct rt_node* rt_node = (struct rt_node*) malloc(sizeof(struct rt_node));
+    struct e_rt_node* rt_node = (struct e_rt_node*) malloc(sizeof(struct e_rt_node));
     unsigned int epoch;
 
     rt_node->addr = addr;
     pthread_mutex_lock(&ebr->lock);
-    epoch = ebr->e_nodes[tid].local_epoch;
+    epoch = ebr->e_nodes[tid].local_epoch & (~ACTIVE);
     list_add_tail(&rt_node->list, &ebr->rt_lists[epoch]);
     pthread_mutex_unlock(&ebr->lock);
 
@@ -86,6 +86,7 @@ extern void ebr_try_gc(struct ebr* ebr) {
     pthread_mutex_lock(&ebr->lock);
     
     if (rand() % GC_FRQ != 0) {
+        pthread_mutex_unlock(&ebr->lock);
         return;
     }
 
@@ -102,8 +103,8 @@ extern void ebr_try_gc(struct ebr* ebr) {
         }
     }
     
-    ebr->global_epoch = epoch + 1;
-    memory_fence();
+    ebr->global_epoch = (epoch + 1) % 3;
+    memory_mfence();
     gc_epoch(ebr, (epoch + 2) % 3);
     
     pthread_mutex_unlock(&ebr->lock);

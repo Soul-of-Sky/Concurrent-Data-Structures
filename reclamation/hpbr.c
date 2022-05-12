@@ -7,63 +7,94 @@
 
 #define GC_FRQ  100
 
-extern struct hpbr* hpbr_create(free_fun_t _free) {
+extern struct hpbr* hpbr_create(free_fun_t _free, int hp_levels) {
     struct hpbr* hpbr = (struct hpbr*) malloc(sizeof(struct hpbr));
     struct hp_node* hp_node;
-    int i;
+    int i, j;
 
     for (i = 0; i < MAX_NUM_THREADS; i++) {
         hp_node = &hpbr->hp_nodes[i];
         hp_node->used = 0;
         INIT_LIST_HEAD(&hp_node->rt_list);
-        memset(hp_node->hps, 0, MAX_NUM_HP_PER_THREAD * sizeof(void*));
+        for (j = 0; j < MAX_NUM_HPS_PER_THREAD; i++) {
+            hp_node->hps[j] = (void*) calloc(hp_levels, sizeof(void*));
+        }
     }
     hpbr->_free = _free;
     pthread_mutex_init(&hpbr->lock, NULL);
+    hpbr->hp_levels = hp_levels;
 
     return hpbr;
 }
 
-extern struct hp_node* hpbr_register_thread(struct hpbr* hpbr, int tid) {
+extern void hpbr_destroy(struct hpbr* hpbr) {
+    struct hp_node* hp_node;
+    struct hp_rt_node* rt_node;
+    struct list_head* list;
+    int i, j;
+
+    for (i = 0; i < MAX_NUM_THREADS; i++) {
+        hp_node = &hpbr->hp_nodes[i];
+        list = &hp_node->rt_list;
+        list_for_each_entry(rt_node, list, list) {
+            hpbr->_free(rt_node->addr);
+            list_del(&rt_node->list);
+            free(rt_node);
+        }
+
+        for (j = 0; j < MAX_NUM_HPS_PER_THREAD; i++) {
+            free(hp_node->hps[j]);
+        }
+    }
+
+    free(hpbr);
+}
+
+extern struct hp_node* hpbr_thread_register(struct hpbr* hpbr, int tid) {
     hpbr->hp_nodes[tid].used = 1;
 }
 
-extern void hp_thread_exit(struct hpbr* hpbr, int tid) {
+extern void hpbr_thread_unregister(struct hpbr* hpbr, int tid) {
     hpbr->hp_nodes[tid].used = 0;
 }
 
-extern void hp_hold(struct hpbr* hpbr, int level, void* addr, int tid) {
-    hpbr->hp_nodes[tid].hps[level] = addr;
+extern void hpbr_hold(struct hpbr* hpbr, int index, int level, void* addr, int tid) {
+    hpbr->hp_nodes[tid].hps[index][level] = addr;
 }
 
-extern void hp_release(struct hpbr* hpbr, int level, int tid) {
-    hpbr->hp_nodes[tid].hps[level] = 0;
+extern void hpbr_release(struct hpbr* hpbr, int index, int level, int tid) {
+    hpbr->hp_nodes[tid].hps[index][level] = 0;
 }
 
-extern void hp_retire(struct hpbr* hpbr, void* addr, int tid) {
+extern void hpbr_release2(struct hpbr* hpbr, int index, int tid) {
+    memset(&hpbr->hp_nodes[tid].hps[index], 0, hpbr->hp_levels);
+}
+
+extern void hpbr_retire(struct hpbr* hpbr, void* addr, int tid) {
     struct hp_node* hp_node = &hpbr->hp_nodes[tid];
     struct list_head* list = &hp_node->rt_list;
-    struct rt_node* rt_node = (struct rt_node*) malloc(sizeof(struct rt_node));
+    struct hp_rt_node* rt_node = (struct hp_rt_node*) malloc(sizeof(struct hp_rt_node));
     rt_node->addr = addr;
 
     list_add_tail(&rt_node->list, list);
 
 #ifndef MANUAL_GC
-    hp_try_gc(hpbr);
+    hpbr_try_gc(hpbr);
 #endif
 }
 
-extern void hp_try_gc(struct hpbr* hpbr) {
+extern void hpbr_try_gc(struct hpbr* hpbr) {
     struct list_head *list;
     struct hp_node* hp_node;
-    struct rt_node* rt_node;
-    const int max_num_hp = MAX_NUM_THREADS * MAX_NUM_HP_PER_THREAD;
+    struct hp_rt_node* rt_node;
+    const int max_num_hp = MAX_NUM_THREADS * MAX_NUM_HPS_PER_THREAD;
     void* hps[max_num_hp];
     void* hp;
     int hps_len;
-    int safe, i, j;
+    int safe, i, j, k;
 
     if (rand() % GC_FRQ != 0) {
+        pthread_mutex_unlock(&hpbr->lock);
         return;
     }
 
@@ -72,16 +103,19 @@ extern void hp_try_gc(struct hpbr* hpbr) {
     for (i = 0; i < MAX_NUM_THREADS; i++) {
         hp_node = &hpbr->hp_nodes[i];
         if (hp_node->used) {
-            for (j = 0; j < MAX_NUM_HP_PER_THREAD; j++) {
-                hp = hp_node->hps[j];
-                if (hp) {
-                    hps[hps_len++] = hp;
+            for (j = 0; j < MAX_NUM_HPS_PER_THREAD; j++) {
+                for (k = 0; k < hpbr->hp_levels; k++) {
+                    hp = hp_node->hps[j][k];
+                    if (hp) {
+                        hps[hps_len++] = hp;
+                    }
                 }
             }
         }
     }
     
     for (i = 0; i < MAX_NUM_THREADS; i++) {
+        hp_node = &hpbr->hp_nodes[i];
         list = &hp_node->rt_list;
         safe = 1;
         list_for_each_entry(rt_node, list, list) {

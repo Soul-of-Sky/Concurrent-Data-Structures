@@ -13,7 +13,7 @@ struct e_node {
     unsigned int local_epoch;
 };
 
-struct rt_node {
+struct e_rt_node {
     void* addr;
     struct list_head list;
 };
@@ -29,7 +29,7 @@ struct ebr {
 extern struct ebr* ebr_create(free_fun_t _free);
 extern void ebr_destroy(struct ebr* ebr);
 extern void ebr_thread_register(struct ebr* ebr, int tid);
-extern void ebr_thread_exit(struct ebr* ebr, int tid);
+extern void ebr_thread_unregister(struct ebr* ebr, int tid);
 extern void ebr_enter(struct ebr* ebr, int tid);
 extern void ebr_exit(struct ebr* ebr, int tid);
 extern void ebr_put(struct ebr* ebr, void* addr, int tid);
