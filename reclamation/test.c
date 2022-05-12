@@ -2,13 +2,14 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <pthread.h>
+#include <sys/time.h>
 
 #include "ebr.h"
 #include "qsbr.h"
 #include "hpbr.h"
 
 #define N               100
-#define NUM_THREADS     2
+#define NUM_THREADS     8
 #define REPEAT_TIMES    10000
 
 /* emulate operations on a lock-free linked list */
@@ -23,11 +24,23 @@ struct item {
 
 pthread_t tids[N];
 
+__thread struct timeval t0, t1;
+__thread double interval;
+
+static inline void start_measure() {
+    gettimeofday(&t0, NULL);
+}
+
+static inline double end_measure() {
+    gettimeofday(&t1, NULL);
+    return t1.tv_sec - t0.tv_sec + 1.0 * (t1.tv_usec - t0.tv_usec) / 1000000;
+}
+
 struct ebr* ebr;
 struct qsbr* qsbr;
 struct hpbr* hpbr;
 
-static void set_free(void* addr) {
+static inline void set_free(void* addr) {
     struct item* it = (struct item*) addr;
     assert(cmpxchg2(&it->free, 0, 1));
 }
@@ -82,8 +95,9 @@ void* ebr_test_fun(void* args) {
                 access_item(&items[i]);
                 break;
             case OP_DEL:
-                logical_del(&items[i]);
-                ebr_put(ebr, &items[i], tid);
+                if (logical_del(&items[i])) {
+                    ebr_put(ebr, &items[i], tid);
+                }
                 break;
             }
         }
@@ -119,8 +133,9 @@ void* qsbr_test_fun(void* args) {
                 access_item(&items[i]);
                 break;
             case OP_DEL:
-                logical_del(&items[i]);
-                qsbr_put(qsbr, &items[i], tid);
+                if (logical_del(&items[i])) {
+                    qsbr_put(qsbr, &items[i], tid);
+                }
                 break;
             }
         }
@@ -169,9 +184,10 @@ void* hpbr_test_fun(void* args) {
                 hpbr_release(hpbr, 1, 0, tid);
                 break;
             case OP_DEL:
-                logical_del(&items[i]);
-                hpbr_retire(hpbr, &items[i], tid);
-                hpbr_release(hpbr, 1, 0, tid);
+                if (logical_del(&items[i])) {
+                    assert(!items[i].vis);
+                    hpbr_retire(hpbr, &items[i], tid);
+                }
                 break;
             }
         }
@@ -182,8 +198,6 @@ void* hpbr_test_fun(void* args) {
 
 void start_test(void* (*test_fun)(void*)) {
     long i;
-    
-    gen_workload();
 
     for (i = 0; i < NUM_THREADS; i++) {
         pthread_create(&tids[i], NULL, test_fun, (void*) i);
@@ -199,17 +213,18 @@ void ebr_test() {
 
     printf("EBR TEST START\n");
 
+    start_measure();
     while(times--) {
+        gen_workload();
+
         ebr = ebr_create(set_free);
 
         start_test(ebr_test_fun);
 
         ebr_destroy(ebr);
-
-        printf("%d\n", REPEAT_TIMES - times);
     }
-
-    printf("EBR PASSED\n");
+    interval = end_measure();
+    printf("EBR PASSED, time elapsed %.3lf seconds\n", interval);
 }
 
 void qsbr_test() {
@@ -218,16 +233,16 @@ void qsbr_test() {
     printf("QSBR TEST START\n");
 
     while(times--) {
+        gen_workload();
+
         qsbr = qsbr_create(set_free);
 
         start_test(qsbr_test_fun);
 
         qsbr_destroy(qsbr);
-
-        printf("%d\n", REPEAT_TIMES - times);
     }
-
-    printf("QSBR PASSED\n");
+    interval = end_measure();
+    printf("QSBR PASSED, time elapsed %.3lf seconds\n", interval);
 }
 
 void hpbr_test() {
@@ -236,20 +251,21 @@ void hpbr_test() {
     printf("HPBR TEST START\n");
 
     while(times--) {
+        gen_workload();
+
         hpbr = hpbr_create(set_free, 1);
 
         start_test(hpbr_test_fun);
 
         hpbr_destroy(hpbr);
-
-        printf("%d\n", REPEAT_TIMES - times);
     }
     
-    printf("HPBR PASSED\n");
+    interval = end_measure();
+    printf("HPBR PASSED, time elapsed %.3lf seconds\n", interval);
 }
 
 int main() {
-    // ebr_test();
-    // qsbr_test();
+    ebr_test();
+    qsbr_test();
     hpbr_test();
 }

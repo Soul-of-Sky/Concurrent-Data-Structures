@@ -18,6 +18,7 @@ struct hp_rt_node {
 struct hp_node {
     int used;
     void** hps[MAX_NUM_HPS_PER_THREAD];
+    pthread_mutex_t lock;
     struct list_head rt_list;
 };
 

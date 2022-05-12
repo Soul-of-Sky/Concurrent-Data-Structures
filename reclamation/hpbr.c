@@ -16,7 +16,8 @@ extern struct hpbr* hpbr_create(free_fun_t _free, int hp_levels) {
         hp_node = &hpbr->hp_nodes[i];
         hp_node->used = 0;
         INIT_LIST_HEAD(&hp_node->rt_list);
-        for (j = 0; j < MAX_NUM_HPS_PER_THREAD; i++) {
+        pthread_mutex_init(&hp_node->lock, NULL);
+        for (j = 0; j < MAX_NUM_HPS_PER_THREAD; j++) {
             hp_node->hps[j] = (void*) calloc(hp_levels, sizeof(void*));
         }
     }
@@ -29,20 +30,20 @@ extern struct hpbr* hpbr_create(free_fun_t _free, int hp_levels) {
 
 extern void hpbr_destroy(struct hpbr* hpbr) {
     struct hp_node* hp_node;
-    struct hp_rt_node* rt_node;
+    struct hp_rt_node *rt_node, *n;
     struct list_head* list;
     int i, j;
 
     for (i = 0; i < MAX_NUM_THREADS; i++) {
         hp_node = &hpbr->hp_nodes[i];
         list = &hp_node->rt_list;
-        list_for_each_entry(rt_node, list, list) {
+        list_for_each_entry_safe(rt_node, n, list, list) {
             hpbr->_free(rt_node->addr);
             list_del(&rt_node->list);
             free(rt_node);
         }
 
-        for (j = 0; j < MAX_NUM_HPS_PER_THREAD; i++) {
+        for (j = 0; j < MAX_NUM_HPS_PER_THREAD; j++) {
             free(hp_node->hps[j]);
         }
     }
@@ -67,7 +68,7 @@ extern void hpbr_release(struct hpbr* hpbr, int index, int level, int tid) {
 }
 
 extern void hpbr_release2(struct hpbr* hpbr, int index, int tid) {
-    memset(&hpbr->hp_nodes[tid].hps[index], 0, hpbr->hp_levels);
+    memset(hpbr->hp_nodes[tid].hps[index], 0, hpbr->hp_levels);
 }
 
 extern void hpbr_retire(struct hpbr* hpbr, void* addr, int tid) {
@@ -76,7 +77,9 @@ extern void hpbr_retire(struct hpbr* hpbr, void* addr, int tid) {
     struct hp_rt_node* rt_node = (struct hp_rt_node*) malloc(sizeof(struct hp_rt_node));
     rt_node->addr = addr;
 
+    pthread_mutex_lock(&hp_node->lock);
     list_add_tail(&rt_node->list, list);
+    pthread_mutex_unlock(&hp_node->lock);
 
 #ifndef MANUAL_GC
     hpbr_try_gc(hpbr);
@@ -86,19 +89,19 @@ extern void hpbr_retire(struct hpbr* hpbr, void* addr, int tid) {
 extern void hpbr_try_gc(struct hpbr* hpbr) {
     struct list_head *list;
     struct hp_node* hp_node;
-    struct hp_rt_node* rt_node;
+    struct hp_rt_node *rt_node, *n;
     const int max_num_hp = MAX_NUM_THREADS * MAX_NUM_HPS_PER_THREAD;
     void* hps[max_num_hp];
     void* hp;
     int hps_len;
     int safe, i, j, k;
 
+    pthread_mutex_lock(&hpbr->lock);
+    
     if (rand() % GC_FRQ != 0) {
         pthread_mutex_unlock(&hpbr->lock);
         return;
     }
-
-    pthread_mutex_lock(&hpbr->lock);
 
     for (i = 0; i < MAX_NUM_THREADS; i++) {
         hp_node = &hpbr->hp_nodes[i];
@@ -118,7 +121,7 @@ extern void hpbr_try_gc(struct hpbr* hpbr) {
         hp_node = &hpbr->hp_nodes[i];
         list = &hp_node->rt_list;
         safe = 1;
-        list_for_each_entry(rt_node, list, list) {
+        list_for_each_entry_safe(rt_node, n, list, list) {
             for (j = 0; j < hps_len; j++) {
                 if (hps[j] == rt_node->addr) {
                     safe = 0;
@@ -127,10 +130,13 @@ extern void hpbr_try_gc(struct hpbr* hpbr) {
             }
             if (safe) {
                 hpbr->_free(rt_node->addr);
+                pthread_mutex_lock(&hp_node->lock);
                 list_del(&rt_node->list);
+                pthread_mutex_unlock(&hp_node->lock);
                 free(rt_node);
             }
         }
     }
+
     pthread_mutex_unlock(&hpbr->lock);
 }

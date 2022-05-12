@@ -17,6 +17,7 @@ extern struct qsbr* qsbr_create(free_fun_t _free) {
         qs_node = &qsbr->qs_nodes[i];
         qs_node->used = 0;
         INIT_LIST_HEAD(&qs_node->rt_list);
+        pthread_mutex_init(&qs_node->lock, NULL);
     }
     qsbr->_free = _free;
 
@@ -37,7 +38,9 @@ static void gc_epoch_before(struct qsbr* qsbr, unsigned long epoch) {
                 break;
             }
             qsbr->_free(rt_node->addr);
+            pthread_mutex_lock(&qs_node->lock);
             list_del(&rt_node->list);
+            pthread_mutex_unlock(&qs_node->lock);
             free(rt_node);
         }
     }
@@ -66,8 +69,9 @@ extern void qsbr_put(struct qsbr* qsbr, void* addr, int tid) {
     rt_node->addr = addr;
     rt_node->epoch = ACCESS_ONCE(qsbr->qs_nodes[tid].local_epoch);
 
+    pthread_mutex_lock(&qs_node->lock);
     list_add_tail(&rt_node->list, &qs_node->rt_list);
-    memory_mfence();
+    pthread_mutex_unlock(&qs_node->lock);
 
 #ifndef MANUAL_GC
     qsbr_try_gc(qsbr);

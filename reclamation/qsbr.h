@@ -17,6 +17,7 @@ struct qs_rt_node {
 struct qs_node {
     int used;
     unsigned long local_epoch;
+    pthread_mutex_t lock;
     struct list_head rt_list;
 };
 

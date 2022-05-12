@@ -68,8 +68,10 @@ extern void ebr_put(struct ebr* ebr, void* addr, int tid) {
     unsigned int epoch;
 
     rt_node->addr = addr;
+    epoch = ACCESS_ONCE(ebr->e_nodes[tid].local_epoch);
+    epoch &= (~ACTIVE);
+
     pthread_mutex_lock(&ebr->lock);
-    epoch = ebr->e_nodes[tid].local_epoch & (~ACTIVE);
     list_add_tail(&rt_node->list, &ebr->rt_lists[epoch]);
     pthread_mutex_unlock(&ebr->lock);
 
@@ -99,12 +101,14 @@ extern void ebr_try_gc(struct ebr* ebr) {
         active = (local_epoch & ACTIVE) == ACTIVE;
         if (active && local_epoch != (epoch | ACTIVE)) {
             gc_epoch(ebr, (epoch + 1) % 3);
+            pthread_mutex_unlock(&ebr->lock);
             return;
         }
     }
     
     ebr->global_epoch = (epoch + 1) % 3;
     memory_mfence();
+
     gc_epoch(ebr, (epoch + 2) % 3);
     
     pthread_mutex_unlock(&ebr->lock);
