@@ -107,7 +107,6 @@ static void do_lookup(long id, int expect_ret) {
 
     for (i = st; i < ed; i++) {
         ret = hs_lookup(hs, k[i], &__v);
-        asm volatile("" : : "r"(ret) : "memory");
         test_assert(expect_ret == -1 || ret == expect_ret);
     }
     

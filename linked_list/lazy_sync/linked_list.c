@@ -19,6 +19,10 @@ static struct ll_node* malloc_node(ukey_t k, uval_t v) {
     return node;
 }
 
+static void free_node(struct ll_node* node) {
+    free(node);
+}
+
 struct ll* ll_create() {
     struct ll* ll = (struct ll*) malloc(sizeof(struct ll));
     ukey_t max_k = UINT64_MAX;
@@ -28,11 +32,9 @@ struct ll* ll_create() {
 
     ll->head->next = ll->tail;
 
-    return ll;
-}
+    ll->ebr = ebr_create(free_node);
 
-static void free_node(struct ll_node* node) {
-    free(node);
+    return ll;
 }
 
 void ll_destroy(struct ll* ll) {
@@ -46,6 +48,8 @@ void ll_destroy(struct ll* ll) {
         pred = curr;
     }
 
+    ebr_destroy(ll->ebr);
+
     free(ll);
 }
 
@@ -53,9 +57,10 @@ static int validate(struct ll_node* pred, struct ll_node* curr) {
     return !IS_MARKED(pred->next) && !IS_MARKED(curr->next) && GET_NODE(pred->next) == curr;
 }
 
-int ll_insert(struct ll* ll, ukey_t k, uval_t v) {
+int ll_insert(struct ll* ll, ukey_t k, uval_t v, int tid) {
     struct ll_node *pred, *curr, *node;
 
+    ebr_enter(ll->ebr, tid);
 retry:    
     pred = ll->head;
     curr = GET_NODE(pred->next);
@@ -70,28 +75,31 @@ retry:
 
     if (validate(pred, curr)) {
         if (k_cmp(curr->e.k, k) == 0) {
-            write_unlock(&pred->lock);
-            write_unlock(&curr->lock);
+            spin_unlock(&pred->lock);
+            spin_unlock(&curr->lock);
+            ebr_exit(ll->ebr, tid);
             return -EEXIST;
         } else {
             node = malloc_node(k, v);
             node->next = curr;
             pred->next = node;
 
-            write_unlock(&pred->lock);
-            write_unlock(&curr->lock);
+            spin_unlock(&pred->lock);
+            spin_unlock(&curr->lock);
+            ebr_exit(ll->ebr, tid);
             return 0;
         }
     } else {
-        write_unlock(&pred->lock);
-        write_unlock(&curr->lock);
+        spin_unlock(&pred->lock);
+        spin_unlock(&curr->lock);
         goto retry;
     }
 }
 
-int ll_lookup(struct ll* ll, ukey_t k, uval_t* v) {
+int ll_lookup(struct ll* ll, ukey_t k, uval_t* v, int tid) {
     struct ll_node *pred, *curr;
 
+    ebr_enter(ll->ebr, tid);
 retry:
     pred = ll->head;
     curr = GET_NODE(pred->next);
@@ -103,16 +111,19 @@ retry:
 
     if (k_cmp(curr->e.k, k) == 0 && !IS_MARKED(curr->next)) {
         *v = curr->e.v;
+        ebr_exit(ll->ebr, tid);
         return 0;
     } else {
         *v = 0;
+        ebr_exit(ll->ebr, tid);
         return -ENOENT;
     }
 }
 
-int ll_remove(struct ll* ll, ukey_t k) {
+int ll_remove(struct ll* ll, ukey_t k, int tid) {
     struct ll_node *pred, *curr;
 
+    ebr_enter(ll->ebr, tid);
 retry:
     pred = ll->head;
     curr = GET_NODE(pred->next);
@@ -129,27 +140,30 @@ retry:
         if (k_cmp(curr->e.k, k) == 0) {
             curr->next = MARK_NODE(curr->next);
             pred->next = GET_NODE(curr->next);
-            //TODO: FREE NODE
+            ebr_put(ll->ebr, curr, tid);
 
-            write_unlock(&pred->lock);
-            write_unlock(&curr->lock);
+            spin_unlock(&pred->lock);
+            spin_unlock(&curr->lock);
+            ebr_exit(ll->ebr, tid);
             return 0;
         } else {
-            write_unlock(&pred->lock);
-            write_unlock(&curr->lock);
+            spin_unlock(&pred->lock);
+            spin_unlock(&curr->lock);
+            ebr_exit(ll->ebr, tid);
             return -ENOENT;
         }
     } else {
-        write_unlock(&pred->lock);
-        write_unlock(&curr->lock);
+        spin_unlock(&pred->lock);
+        spin_unlock(&curr->lock);
         goto retry;
     }
 }
 
-int ll_range(struct ll* ll, ukey_t k, unsigned int len, uval_t* v_arr) {
+int ll_range(struct ll* ll, ukey_t k, unsigned int len, uval_t* v_arr, int tid) {
     struct ll_node *curr;
     int cnt = 0;
 
+    ebr_enter(ll->ebr, tid);
     curr = GET_NODE(ll->head->next);
     
     while(k_cmp(curr->e.k, k) < 0) {
@@ -160,6 +174,7 @@ int ll_range(struct ll* ll, ukey_t k, unsigned int len, uval_t* v_arr) {
         v_arr[cnt++] = curr->e.v;
         curr = GET_NODE(curr->next);
     }
+    ebr_exit(ll->ebr, tid);
 
     return cnt;
 }

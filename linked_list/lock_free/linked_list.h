@@ -6,6 +6,7 @@
 
 #include "atomic.h"
 #include "util.h"
+#include "ebr.h"
 
 typedef size_t markable_t;
 
@@ -16,6 +17,7 @@ struct ll_node {
 
 struct ll {
     struct ll_node *head, *tail;
+    struct ebr* ebr;
 };
 
 #define IS_MARKED(v)        ((v) & 0x1)
@@ -25,10 +27,10 @@ struct ll {
 
 extern struct ll* ll_create();
 extern void ll_destroy(struct ll* ll);
-extern int ll_insert(struct ll* ll, ukey_t k, uval_t v);
-extern int ll_lookup(struct ll* ll, ukey_t k, uval_t* v);
-extern int ll_remove(struct ll* ll, ukey_t k);
-extern int ll_range(struct ll* ll, ukey_t k, unsigned int len, uval_t* v_arr);
+extern int ll_insert(struct ll* ll, ukey_t k, uval_t v, int tid);
+extern int ll_lookup(struct ll* ll, ukey_t k, uval_t* v, int tid);
+extern int ll_remove(struct ll* ll, ukey_t k, int tid);
+extern int ll_range(struct ll* ll, ukey_t k, unsigned int len, uval_t* v_arr, int tid);
 extern void ll_print(struct ll* ll);
 
 #ifdef LL_DEBUG

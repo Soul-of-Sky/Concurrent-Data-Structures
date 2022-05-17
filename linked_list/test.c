@@ -12,12 +12,12 @@
 #endif
 #include "linked_list.h"
 
-#define N           100000
+#define N           10000
 #define NUM_THREAD  12
 
 #define RAND
 // #define DETAIL
-// #define ASSERT
+#define ASSERT
 
 #ifdef DETAIL
 #define test_print(fmt, args ...) do{printf(fmt, ##args);}while(0)
@@ -82,12 +82,12 @@ static void do_insert(long id, int expect_ret) {
     double interval;
 
     start_measure();
-
+    
     st = 1.0 * id / NUM_THREAD * N;
     ed = 1.0 * (id + 1) / NUM_THREAD * N;
 
     for (i = st; i < ed; i++) {
-        ret = ll_insert(ll, k[i], v[i]);
+        ret = ll_insert(ll, k[i], v[i], (int)id);
         test_assert(expect_ret == -1 || ret == expect_ret);
     }
 
@@ -106,8 +106,7 @@ static void do_lookup(long id, int expect_ret) {
     ed = 1.0 * (id + 1) / NUM_THREAD * N;
 
     for (i = st; i < ed; i++) {
-        ret = ll_lookup(ll, k[i], &__v);
-        asm volatile("" : : "r"(ret) : "memory");
+        ret = ll_lookup(ll, k[i], &__v, (int)id);
         test_assert(expect_ret == -1 || ret == expect_ret);
     }
     
@@ -125,7 +124,7 @@ static void do_remove(long id, int expect_ret) {
     ed = 1.0 * (id + 1) / NUM_THREAD * N;
 
     for (i = st; i < ed; i++) {
-        ret = ll_remove(ll, k[i]);
+        ret = ll_remove(ll, k[i], (int)id);
         test_assert(expect_ret == -1 || ret == expect_ret);
     }
 
@@ -139,12 +138,8 @@ static void do_range(long id) {
 
     start_measure();
 
-    ret = ll_range(ll, 0, N, v_arr);
-    asm volatile("" : : "r"(ret) : "memory");
+    ret = ll_range(ll, 0, N, v_arr, (int)id);
     test_assert(ret == N);
-    for (i = 0; i < N; i++) {
-        test_assert(v_arr[i] == i);
-    }
 
     interval = end_measure();
     test_print("thread[%ld] end in %.3lf seconds\n", interval);
@@ -191,11 +186,13 @@ int main() {
     pthread_barrier_init(&barrier, NULL, NUM_THREAD);
 
     for (i = 0; i < NUM_THREAD; i++) {
+        ebr_thread_register(ll->ebr, i);
         pthread_create(&tids[i], NULL, test, (void*) i);
     }
 
     for (i = 0; i < NUM_THREAD; i++) {
         pthread_join(tids[i], NULL);
+        ebr_thread_unregister(ll->ebr, i);
     }
 
     ll_destroy(ll);

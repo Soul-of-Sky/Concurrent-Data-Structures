@@ -37,7 +37,7 @@ All these three reclamations are available to build and tested, use them as you 
 
 All these data structures use **EBR** by default(I try to use ```#ifdef``` to group them together, but then the code is too ugly to read, so I change my mind). 
 
-You can change to other reclamation by adding code where there are TODO comments.
+You can change to other reclamation by adding code in the right place.
 
 
 ## References
