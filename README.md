@@ -6,36 +6,42 @@ C language implementation of common concurrent data structures with multiple mem
 
 ## Schedule
 
-|                                      | BUILD | TESTED | Reclamation |
-| ------------------------------------ | :---: | :----: | :---------: |
-| QSBR                                 |   O   |   O    |     --      |
-| EBR                                  |   O   |   O    |     --      |
-| HPBR                                 |   O   |   O    |     --      |
-| lazy-sync linked list                |   O   |   O    |      X      |
-| lock-free linked list                |   O   |   O    |      X      |
-| producer-consumer queue              |   O   |   O    |      X      |
-| lazy-sync queue                      |   O   |   O    |      X      |
-| lock-free back-off stack             |   O   |   O    |      X      |
-| lock-free elimination back-off stack |   O   |   O    |      X      |
-| lock-free hashset                    |   O   |   O    |      X      |
-| concurrent heap                      |   O   |   O    |      X      |
-| lazy-sync skiplist                   |   O   |   O    |      X      |
-| lock-free skiplist                   |   O   |   O    |      X      |
-| concurrent b+tree                    |   O   |   O    |     --      |
+|                                      | BUILD | TESTED | Memory Reclamation | No Memory Leak |
+| ------------------------------------ | :---: | :----: | :----------------: | :------------: |
+| QSBR                                 |   O   |   O    |         --         |       --       |
+| EBR                                  |   O   |   O    |         --         |       --       |
+| HPBR                                 |   O   |   O    |         --         |       --       |
+| lazy-sync linked list                |   O   |   O    |         O          |       O        |
+| lock-free linked list                |   O   |   O    |         X          |                |
+| producer-consumer queue              |   O   |   O    |         X          |                |
+| lazy-sync queue                      |   O   |   O    |         X          |                |
+| lock-free back-off stack             |   O   |   O    |         X          |                |
+| lock-free elimination back-off stack |   O   |   O    |         X          |                |
+| lock-free hashset                    |   O   |   O    |         X          |                |
+| concurrent heap                      |   O   |   O    |         X          |                |
+| lazy-sync skiplist                   |   O   |   O    |         X          |                |
+| lock-free skiplist                   |   O   |   O    |         X          |                |
+| concurrent b+tree                    |   O   |   O    |         --         |                |
 
 * Concurrent Data Structures:
 
-All these three data structures are available to build and tested.
+All these data structures are available to build and tested.
+
+All these data structures are tested with no memory leak using ```valgrind --tool=memcheck``` .
 
 You are free to "play" with it. 
 
 * Memory Reclamation:
 
-**QSBR**: quiescent-state-based reclamation, **EBR**: epoch-based reclaimation, **HPBR**: hazard-pointer-based reclaimation
+**QSBR**: quiescent-state-based reclamation
+
+**EBR**: epoch-based reclaimation
+
+**HPBR**: hazard-pointer-based reclaimation
 
 All these three reclamations are available to build and tested, use them as you wish.
 
-All these data structures use **EBR** by default(I try to use ```#ifdef``` to group them together, but then the code is too ugly to read, so I change my mind). 
+All these data structures use **EBR** by default(I tried to use ```#ifdef``` to group them together, but then the code was too ugly to read, so I changed my mind). 
 
 You can change to other reclamation by adding code in the right place.
 
