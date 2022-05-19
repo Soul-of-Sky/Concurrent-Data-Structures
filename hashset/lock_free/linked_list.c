@@ -11,7 +11,7 @@
 static struct ll_node* malloc_node(ukey_t k, uval_t v) {
     struct ll_node* node = (struct ll_node*) malloc(sizeof(struct ll_node));
 
-    node->next = NULL;
+    node->next = (markable_t) NULL;
     node->e.k = k;
     node->e.v = v;
 
@@ -25,7 +25,7 @@ struct ll* ll_create() {
     ll->head = malloc_node(0, 0);
     ll->tail = malloc_node(max_k, 0);
 
-    ll->head->next = ll->tail;
+    ll->head->next = (markable_t) ll->tail;
 
     return ll;
 }
@@ -39,16 +39,18 @@ void ll_destroy(struct ll* ll) {
 
     pred = ll->head;
 
+    int cnt = 0;
     while(pred) {
         curr = GET_NODE(pred->next);
         free_node(pred);
         pred = curr;
+        cnt++;
     }
 
     free(ll);
 }
 
-static void find(struct ll* ll, ukey_t k, struct ll_node** pred, struct ll_node** curr) {
+static void find(struct ll* ll, ukey_t k, struct ll_node** pred, struct ll_node** curr, int tid, struct ebr* ebr) {
     struct ll_node *__pred, *__curr;
     markable_t pred_markable_v, curr_markable_v;
 
@@ -58,14 +60,13 @@ retry:
     while(1) {
         curr_markable_v = __curr->next;
         while(IS_MARKED(curr_markable_v)) {
-            pred_markable_v = __pred->next;
-            if (!cmpxchg2(&__pred->next, REMOVE_MARK(pred_markable_v), REMOVE_MARK(curr_markable_v))) {
+            if (!cmpxchg2(&__pred->next, __curr, REMOVE_MARK(curr_markable_v))) {
                 goto retry;
             }
-            __pred = __curr;
-            __curr = REMOVE_MARK(curr_markable_v);
+            ebr_put(ebr, __curr, tid);
 
-            //TODO: FREE NODE
+            __curr = (struct ll_node*) REMOVE_MARK(curr_markable_v);
+            curr_markable_v = __curr->next;
         }
         if (k_cmp(__curr->e.k, k) >= 0) {
             *pred = __pred;
@@ -73,21 +74,21 @@ retry:
             return;
         }
         __pred = __curr;
-        __curr = REMOVE_MARK(curr_markable_v);
+        __curr = (struct ll_node*) REMOVE_MARK(curr_markable_v);
     }
 }
 
-int ll_insert(struct ll* ll, ukey_t k, uval_t v) {
+int ll_insert(struct ll* ll, ukey_t k, uval_t v, int tid, struct ebr* ebr) {
     struct ll_node *pred, *curr, *node;
 
 retry:
-    find(ll, k, &pred, &curr);
+    find(ll, k, &pred, &curr, tid, ebr);
 
     if (k_cmp(curr->e.k, k) == 0) {
         return -EEXIST;
     } else {
         node = malloc_node(k, v);
-        node->next = curr;
+        node->next = (markable_t) curr;
         
         if (!cmpxchg2(&pred->next, curr, node)) {
             free_node(node);
@@ -97,16 +98,16 @@ retry:
     }
 }
 
-extern int ll_insert2(struct ll* ll, struct ll_node* node) {
+extern int ll_insert2(struct ll* ll, struct ll_node* node, int tid, struct ebr* ebr) {
     struct ll_node *pred, *curr;
     ukey_t k = node->e.k;
 retry:
-    find(ll, k, &pred, &curr);
+    find(ll, k, &pred, &curr, tid, ebr);
 
     if (k_cmp(curr->e.k, k) == 0) {
         return -EEXIST;
     } else {
-        node->next = curr;
+        node->next = (markable_t) curr;
         
         if (!cmpxchg2(&pred->next, curr, node)) {
             goto retry;
@@ -115,7 +116,7 @@ retry:
     }
 }
 
-int ll_lookup(struct ll* ll, ukey_t k, uval_t* v) {
+int ll_lookup(struct ll* ll, ukey_t k, uval_t* v, int tid, struct ebr* ebr) {
     struct ll_node *curr = GET_NODE(ll->head->next);
 
     while(k_cmp(curr->e.k, k) < 0) {
@@ -131,19 +132,21 @@ int ll_lookup(struct ll* ll, ukey_t k, uval_t* v) {
     }
 }
 
-int ll_remove(struct ll* ll, ukey_t k) {
+int ll_remove(struct ll* ll, ukey_t k, int tid, struct ebr* ebr) {
     struct ll_node *pred, *curr;
     markable_t curr_markable_v;
 
 retry:
-    find(ll, k, &pred, &curr);
+    find(ll, k, &pred, &curr, tid, ebr);
 
     if (k_cmp(curr->e.k, k) == 0) {
         curr_markable_v = curr->next;
         if (!cmpxchg2(&curr->next, REMOVE_MARK(curr_markable_v), MARK_NODE(curr_markable_v))) {
             goto retry;
         }
-        cmpxchg2(&pred->next, curr, REMOVE_MARK(curr_markable_v));
+        if (cmpxchg2(&pred->next, curr, REMOVE_MARK(curr_markable_v))) {
+            ebr_put(ebr, curr, tid);
+        }
         return 0;
     } else {
         return -ENOENT;

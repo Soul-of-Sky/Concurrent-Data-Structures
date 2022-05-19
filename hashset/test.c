@@ -12,12 +12,12 @@
 #endif
 #include "hashset.h"
 
-#define N           1000000
-#define NUM_THREAD  6
+#define N           10000000
+#define NUM_THREAD  8
 
 #define RAND
 // #define DETAIL
-// #define ASSERT
+#define ASSERT
 
 #ifdef DETAIL
 #define test_print(fmt, args ...) do{printf(fmt, ##args);}while(0)
@@ -87,7 +87,7 @@ static void do_insert(long id, int expect_ret) {
     ed = 1.0 * (id + 1) / NUM_THREAD * N;
 
     for (i = st; i < ed; i++) {
-        ret = hs_insert(hs, k[i], v[i]);
+        ret = hs_insert(hs, k[i], v[i], (int)id);
         test_assert(expect_ret == -1 || ret == expect_ret);
     }
 
@@ -106,7 +106,7 @@ static void do_lookup(long id, int expect_ret) {
     ed = 1.0 * (id + 1) / NUM_THREAD * N;
 
     for (i = st; i < ed; i++) {
-        ret = hs_lookup(hs, k[i], &__v);
+        ret = hs_lookup(hs, k[i], &__v, (int)id);
         test_assert(expect_ret == -1 || ret == expect_ret);
     }
     
@@ -124,7 +124,7 @@ static void do_remove(long id, int expect_ret) {
     ed = 1.0 * (id + 1) / NUM_THREAD * N;
 
     for (i = st; i < ed; i++) {
-        ret = hs_remove(hs, k[i]);
+        ret = hs_remove(hs, k[i], (int)id);
         test_assert(expect_ret == -1 || ret == expect_ret);
     }
 
@@ -150,17 +150,17 @@ void* test(void* arg) {
 
     do_barrier(id, "LOOKUP");
 
-    do_remove(id, 0);
+    // do_remove(id, 0);
 
-    do_barrier(id, "REMOVE");
+    // do_barrier(id, "REMOVE");
 
-    do_lookup(id, -ENOENT);
+    // do_lookup(id, -ENOENT);
 
-    do_barrier(id, "LOOKUP");
+    // do_barrier(id, "LOOKUP");
 }
 
 int main() {
-    int i;
+    long i;
 
     gen_data();
 
@@ -169,11 +169,13 @@ int main() {
     pthread_barrier_init(&barrier, NULL, NUM_THREAD);
 
     for (i = 0; i < NUM_THREAD; i++) {
+        ebr_thread_register(hs->ebr, i);
         pthread_create(&tids[i], NULL, test, (void*) i);
     }
 
     for (i = 0; i < NUM_THREAD; i++) {
         pthread_join(tids[i], NULL);
+        ebr_thread_unregister(hs->ebr, i);
     }
 
     hs_destroy(hs);

@@ -47,7 +47,7 @@ static int get_fa_index(struct hash_set* hs, int b_id) {
     return b_id - b_id_fence;
 }
 
-static struct bucket_list* get_bucket_list(struct hash_set* hs, int b_id) {
+static struct bucket_list* get_bucket_list(struct hash_set* hs, int b_id, int tid) {
     int c_id = b_id / BUCKET_PER_CLUSTER;
     int c_b_id = b_id % BUCKET_PER_CLUSTER;
     cluster_t* cluster;
@@ -59,7 +59,7 @@ static struct bucket_list* get_bucket_list(struct hash_set* hs, int b_id) {
 
     if (likely(b_id != 0)) {
         fa_b_id = get_fa_index(hs, b_id);
-        fa_bucket = get_bucket_list(hs, fa_b_id);
+        fa_bucket = get_bucket_list(hs, fa_b_id, tid);
         assert(fa_bucket);
     }
 
@@ -79,7 +79,7 @@ static struct bucket_list* get_bucket_list(struct hash_set* hs, int b_id) {
     if (bucket == NULL) {
         bucket = (struct bucket_list*) malloc(sizeof(struct bucket_list));
         bucket->bucket_head = ll_create();
-        ll_insert(bucket->bucket_head, set_sentinel_key(b_id), NULL);
+        ll_insert(bucket->bucket_head, set_sentinel_key(b_id), (markable_t) NULL, tid, hs->ebr);
         cluster = hs->clusters[c_id];
         if (!cmpxchg2(&(buckets[c_b_id]), NULL, bucket)) {
             ll_destroy(bucket->bucket_head);
@@ -88,7 +88,7 @@ static struct bucket_list* get_bucket_list(struct hash_set* hs, int b_id) {
             /*insert the sentinel key into the lock-free linked list*/
             sentinel_node = GET_NODE(bucket->bucket_head->head->next);
             assert(!IS_MARKED(sentinel_node->next));
-            ret = ll_insert2(fa_bucket->bucket_head, sentinel_node);
+            ret = ll_insert2(fa_bucket->bucket_head, sentinel_node, tid, hs->ebr);
             assert(ret == 0);
         }
     }
@@ -109,9 +109,12 @@ static struct bucket_list* get_bucket_list2(struct hash_set* hs, int b_id) {
     }
     buckets = (struct bucket_list**) cluster;
     bucket = buckets[c_b_id];
-    /*init a new bucket list*/
 
     return bucket;
+}
+
+static void free_ll_node(struct ll_node* node) {
+    free(node);
 }
 
 extern struct hash_set* hs_create() {
@@ -119,13 +122,11 @@ extern struct hash_set* hs_create() {
     
     hs->num_e = 0;
     hs->num_b = MIN_NUM_BUCKETS;
-    get_bucket_list(hs, 0);
+    get_bucket_list(hs, 0, 0);
+
+    hs->ebr = ebr_create((free_fun_t) free_ll_node);
 
     return hs;
-}
-
-static void free_ll_node(struct ll_node* node) {
-    free(node);
 }
 
 extern void hs_destroy(struct hash_set* hs) {
@@ -134,24 +135,38 @@ extern void hs_destroy(struct hash_set* hs) {
     int i;
 
     ll_destroy(bucket0->bucket_head);
+    free(bucket0);
 
     for (i = 1; i < hs->num_b; i++) {
         bucket = get_bucket_list2(hs, i);
         if (bucket != NULL) {
             free_ll_node(bucket->bucket_head->head);
             free_ll_node(bucket->bucket_head->tail);
+            free(bucket->bucket_head);
+            free(bucket);
         }
     }
+
+    for (i = 0; i < (hs->num_b - 1) / BUCKET_PER_CLUSTER + 1; i++) {
+        free(hs->clusters[i]);
+    }
+    
+    ebr_destroy(hs->ebr);
+
+    free(hs);
 }
 
-extern int hs_insert(struct hash_set* hs, ukey_t k, uval_t v) {
+extern int hs_insert(struct hash_set* hs, ukey_t k, uval_t v, int tid) {
+    ebr_enter(hs->ebr, tid);
+
     int b_id = k % hs->num_b;
-    struct bucket_list* bucket = get_bucket_list(hs, b_id);
+    struct bucket_list* bucket = get_bucket_list(hs, b_id, tid);
     int num_e, num_b;
 
     assert(bucket);
 
-    if (ll_insert(bucket->bucket_head, set_key(k), v) == -EEXIST) {
+    if (ll_insert(bucket->bucket_head, set_key(k), v, tid, hs->ebr) == -EEXIST) {
+        ebr_exit(hs->ebr, tid);
         return -EEXIST;
     }
 
@@ -169,29 +184,42 @@ extern int hs_insert(struct hash_set* hs, ukey_t k, uval_t v) {
         }
     }
 
+    ebr_exit(hs->ebr, tid);
     return 0;
 }
 
-extern int hs_lookup(struct hash_set* hs, ukey_t k, uval_t* v) {
+extern int hs_lookup(struct hash_set* hs, ukey_t k, uval_t* v, int tid) {
+    ebr_enter(hs->ebr, tid);
+
     int b_id = k % hs->num_b;
-    struct bucket_list* bucket = get_bucket_list(hs, b_id);
+    struct bucket_list* bucket = get_bucket_list(hs, b_id, tid);
+    int ret;
     
     assert(bucket);
 
-    return ll_lookup(bucket->bucket_head, set_key(k), v);
+    ret = ll_lookup(bucket->bucket_head, set_key(k), v, tid, hs->ebr);
+
+    ebr_exit(hs->ebr, tid);
+    return ret;
 }
 
-extern int hs_remove(struct hash_set* hs, ukey_t k) {
+extern int hs_remove(struct hash_set* hs, ukey_t k, int tid) {
+    ebr_enter(hs->ebr, tid);
+
     int b_id = k % hs->num_b;
-    struct bucket_list* bucket = get_bucket_list(hs, b_id);
+    struct bucket_list* bucket = get_bucket_list(hs, b_id, tid);
+    int ret;
 
     assert(bucket);
 
-    return ll_remove(bucket->bucket_head, set_key(k));
+    ret = ll_remove(bucket->bucket_head, set_key(k), tid, hs->ebr);
+
+    ebr_exit(hs->ebr, tid);
+    return ret;
 }
 
 extern void hs_print(struct hash_set* hs) {
-    struct bucket_list* bucket0 = get_bucket_list(hs, 0);
+    struct bucket_list* bucket0 = get_bucket_list(hs, 0, 0);
     
     ll_print(bucket0->bucket_head);
 }
