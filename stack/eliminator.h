@@ -27,11 +27,20 @@
 
 struct exchanger {
     volatile uint64_t ev;
-}_ex;
+};
 
 struct elimination {
     struct exchanger e_arr[E_ARR_SIZE];
-}_el;
+};
+
+static struct elimination* el_create() {
+    struct elimination* el = calloc(1, sizeof(struct elimination));
+    return el;
+}
+
+static void el_destroy(struct elimination* el) {
+    free(el);
+}
 
 static int exchange(struct exchanger* ex, uint64_t v, unsigned long timeout_usecs, uint64_t* ex_v) {
     struct timeval t0, t1;

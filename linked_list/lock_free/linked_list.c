@@ -11,7 +11,7 @@
 static struct ll_node* malloc_node(ukey_t k, uval_t v) {
     struct ll_node* node = (struct ll_node*) malloc(sizeof(struct ll_node));
 
-    node->next = NULL;
+    node->next = (markable_t) NULL;
     node->e.k = k;
     node->e.v = v;
 
@@ -29,9 +29,9 @@ struct ll* ll_create() {
     ll->head = malloc_node(0, 0);
     ll->tail = malloc_node(max_k, 0);
 
-    ll->head->next = ll->tail;
+    ll->head->next = (markable_t) ll->tail;
 
-    ll->ebr = ebr_create(free_node);
+    ll->ebr = ebr_create((free_fun_t) free_node);
 
     return ll;
 }
@@ -52,9 +52,9 @@ void ll_destroy(struct ll* ll) {
     free(ll);
 }
 
-static void find(struct ll* ll, ukey_t k, struct ll_node** pred, struct ll_node** curr) {
+static void find(struct ll* ll, ukey_t k, struct ll_node** pred, struct ll_node** curr, int tid) {
     struct ll_node *__pred, *__curr;
-    markable_t pred_markable_v, curr_markable_v;
+    markable_t curr_markable_v;
 
 retry: 
     __pred = ll->head;
@@ -62,14 +62,13 @@ retry:
     while(1) {
         curr_markable_v = __curr->next;
         while(IS_MARKED(curr_markable_v)) {
-            pred_markable_v = __pred->next;
-            if (!cmpxchg2(&__pred->next, REMOVE_MARK(pred_markable_v), REMOVE_MARK(curr_markable_v))) {
+            if (!cmpxchg2(&__pred->next, __curr, REMOVE_MARK(curr_markable_v))) {
                 goto retry;
             }
-            __pred = __curr;
-            __curr = REMOVE_MARK(curr_markable_v);
+            ebr_put(ll->ebr, __curr, tid);
 
-            //TODO: FREE NODE
+            __curr = GET_NODE(curr_markable_v);
+            curr_markable_v = __curr->next;
         }
         if (k_cmp(__curr->e.k, k) >= 0) {
             *pred = __pred;
@@ -77,7 +76,7 @@ retry:
             return;
         }
         __pred = __curr;
-        __curr = REMOVE_MARK(curr_markable_v);
+        __curr = GET_NODE(curr_markable_v);
     }
 }
 
@@ -86,20 +85,20 @@ int ll_insert(struct ll* ll, ukey_t k, uval_t v, int tid) {
     
     ebr_enter(ll->ebr, tid);
 retry:
-    find(ll, k, &pred, &curr);
+    find(ll, k, &pred, &curr, tid);
 
     if (k_cmp(curr->e.k, k) == 0) {
         ebr_exit(ll->ebr, tid);
         return -EEXIST;
     } else {
         node = malloc_node(k, v);
-        node->next = curr;
+        node->next = (markable_t) curr;
         
         if (!cmpxchg2(&pred->next, curr, node)) {
             free_node(node);
-            ebr_exit(ll->ebr, tid);
             goto retry;
         }
+        ebr_exit(ll->ebr, tid);
         return 0;
     }
 }
@@ -129,15 +128,16 @@ int ll_remove(struct ll* ll, ukey_t k, int tid) {
 
     ebr_enter(ll->ebr, tid);
 retry:
-    find(ll, k, &pred, &curr);
+    find(ll, k, &pred, &curr, tid);
 
     if (k_cmp(curr->e.k, k) == 0) {
         curr_markable_v = curr->next;
         if (!cmpxchg2(&curr->next, REMOVE_MARK(curr_markable_v), MARK_NODE(curr_markable_v))) {
             goto retry;
         }
-        cmpxchg2(&pred->next, curr, REMOVE_MARK(curr_markable_v));
-        ebr_put(ll->ebr, curr, tid);
+        if (cmpxchg2(&pred->next, curr, REMOVE_MARK(curr_markable_v))) {
+            ebr_put(ll->ebr, curr, tid);
+        }
         ebr_exit(ll->ebr, tid);
         return 0;
     } else {
@@ -151,6 +151,7 @@ int ll_range(struct ll* ll, ukey_t k, unsigned int len, uval_t* v_arr, int tid) 
     int cnt = 0;
 
     ebr_enter(ll->ebr, tid);
+
     curr = GET_NODE(ll->head->next);
     
     while(k_cmp(curr->e.k, k) < 0) {

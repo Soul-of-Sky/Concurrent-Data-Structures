@@ -20,9 +20,9 @@ struct ll {
     struct ebr* ebr;
 };
 
-#define IS_MARKED(v)        ((v) & 0x1)
-#define MARK_NODE(v)        ((v) | 0x1)
-#define REMOVE_MARK(v)      ((v) & ~0x1)
+#define IS_MARKED(v)        (markable_t) ((v) & 0x1)
+#define MARK_NODE(v)        (markable_t) ((v) | 0x1)
+#define REMOVE_MARK(v)      (markable_t) ((v) & ~0x1)
 #define GET_NODE(v)         ((struct ll_node*) REMOVE_MARK(v))
 
 extern struct ll* ll_create();

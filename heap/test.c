@@ -12,15 +12,15 @@
 #endif
 #include "heap.h"
 
-#define N           1000000
+#define N           10000000
 /*NUM_THREAD HAS TO BE AN ODD*/
-#define NUM_THREAD  6
+#define NUM_THREAD  8
 
-#define POOL_SIZE   100000
+#define POOL_SIZE   10000
 
 #define RAND
 // #define DETAIL
-// #define ASSERT
+#define ASSERT
 
 #ifdef DETAIL
 #define test_print(fmt, args ...) do{printf(fmt, ##args);}while(0)
@@ -141,7 +141,7 @@ void* pop_fun(void* arg) {
 }
 
 int main() {
-    int i;
+    long i;
 
     gen_data();
 

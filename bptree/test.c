@@ -12,12 +12,14 @@
 #endif
 #include "bptree.h"
 
-#define N           1000000
+#define PAGE_SIZE   32
+
+#define N           10000000
 #define NUM_THREAD  8
 
 #define RAND
 // #define DETAIL
-// #define ASSERT
+#define ASSERT
 
 #ifdef DETAIL
 #define test_print(fmt, args ...) do{printf(fmt, ##args);}while(0)
@@ -89,8 +91,6 @@ static void do_insert(long id, int expect_ret) {
     for (i = st; i < ed; i++) {
         ret = bp_insert(bp, k[i], v[i]);
         test_assert(expect_ret == -1 || ret == expect_ret);
-        // printf("INSERT %lu\n", k[i]);
-        // bp_print(bp);
     }
 
     interval = end_measure();
@@ -128,8 +128,6 @@ static void do_remove(long id, int expect_ret) {
     for (i = st; i < ed; i++) {
         ret = bp_remove(bp, k[i]);
         test_assert(expect_ret == -1 || ret == expect_ret);
-        // printf("REMOVE %lu\n", k[i]);
-        // bp_print(bp);
     }
 
     interval = end_measure();
@@ -181,11 +179,11 @@ void* test(void* arg) {
 }
 
 int main() {
-    int i;
+    long i;
 
     gen_data();
 
-    bp = bp_create(32);
+    bp = bp_create(PAGE_SIZE);
     
     pthread_barrier_init(&barrier, NULL, NUM_THREAD);
 

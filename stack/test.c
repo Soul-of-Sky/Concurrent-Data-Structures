@@ -18,7 +18,7 @@
 
 #define RAND
 // #define DETAIL
-// #define ASSERT
+#define ASSERT
 
 #ifdef DETAIL
 #define test_print(fmt, args ...) do{printf(fmt, ##args);}while(0)
@@ -95,7 +95,7 @@ static void do_push(long id, int expect_ret) {
     ed = 1.0 * (id + 1) / NUM_THREAD * N;
 
     for (i = st; i < ed; i++) {
-        s_push(s, v[i]);
+        s_push(s, v[i], (int)id);
         test_assert(expect_ret == -1 || ret == expect_ret);
     }
 
@@ -114,7 +114,7 @@ static void do_pop(long id, int expect_ret) {
     ed = 1.0 * (id + 1) / NUM_THREAD * N;
 
     for (i = st; i < ed; i++) {
-        s_pop(s, &v);
+        s_pop(s, &v, (int)id);
         test_assert(expect_ret == -1 || ret == expect_ret);
     }
 
@@ -139,7 +139,7 @@ void* pop_fun(void* arg) {
 }
 
 int main() {
-    int i;
+    long i;
 
     gen_data();
 
@@ -148,12 +148,15 @@ int main() {
     pthread_barrier_init(&barrier, NULL, NUM_THREAD);
 
     for (i = 0; i < NUM_THREAD / 2; i++) {
+        ebr_thread_register(s->ebr, i);
+        ebr_thread_register(s->ebr, NUM_THREAD / 2 + i);
         pthread_create(&tids[i], NULL, push_fun, (void*) i);
         pthread_create(&tids[NUM_THREAD / 2 + i], NULL, pop_fun, (void*) (NUM_THREAD / 2 + i));
     }
 
     for (i = 0; i < NUM_THREAD; i++) {
         pthread_join(tids[i], NULL);
+        ebr_thread_unregister(s->ebr, i);
     }
 
     s_destroy(s);

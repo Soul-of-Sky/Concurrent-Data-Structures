@@ -10,10 +10,13 @@
 #ifdef __APPLE__
 #include "pthread_barrier.h"
 #endif
-#include "skiplist.h"
+#include "queue.h"
 
 #define N           10000000
+/*NUM_THREAD HAS TO BE AN ODD*/
 #define NUM_THREAD  8
+
+#define POOL_SIZE   10000
 
 #define RAND
 // #define DETAIL
@@ -40,7 +43,7 @@ pthread_t tids[NUM_THREAD];
 ukey_t k[N];
 uval_t v[N];
 
-struct sl* sl;
+struct queue* q;
 
 static void gen_data() {
     int i;
@@ -77,74 +80,6 @@ static double end_measure() {
     return t1.tv_sec - t0.tv_sec + (t1.tv_usec - t0.tv_usec) / 1e6;
 }
 
-static void do_insert(long id, int expect_ret) {
-    int st, ed, i, ret;
-    double interval;
-
-    start_measure();
-
-    st = 1.0 * id / NUM_THREAD * N;
-    ed = 1.0 * (id + 1) / NUM_THREAD * N;
-
-    for (i = st; i < ed; i++) {
-        ret = sl_insert(sl, k[i], v[i], (int)id);
-        test_assert(expect_ret == -1 || ret == expect_ret);
-    }
-
-    interval = end_measure();
-    test_print("thread[%ld] end in %.3lf seconds\n", interval);
-}
-
-static void do_lookup(long id, int expect_ret) {
-    int st, ed, i, ret;
-    double interval;
-    uval_t __v;
-
-    start_measure();
-
-    st = 1.0 * id / NUM_THREAD * N;
-    ed = 1.0 * (id + 1) / NUM_THREAD * N;
-
-    for (i = st; i < ed; i++) {
-        ret = sl_lookup(sl, k[i], &__v, (int)id);
-        test_assert(expect_ret == -1 || ret == expect_ret);
-    }
-    
-    interval = end_measure();
-    test_print("thread[%ld] end in %.3lf seconds\n", interval);
-}
-
-static void do_remove(long id, int expect_ret) {
-    int st, ed, i, ret;
-    double interval;
-
-    start_measure();
-
-    st = 1.0 * id / NUM_THREAD * N;
-    ed = 1.0 * (id + 1) / NUM_THREAD * N;
-
-    for (i = st; i < ed; i++) {
-        ret = sl_remove(sl, k[i], (int)id);
-        test_assert(expect_ret == -1 || ret == expect_ret);
-    }
-
-    interval = end_measure();
-    test_print("thread[%ld] end in %.3lf seconds\n", interval);
-}
-
-static void do_range(long id) {
-    int st, ed, i, ret;
-    double interval;
-
-    start_measure();
-
-    ret = sl_range(sl, 0, N, v_arr, (int)id);
-    test_assert(ret == N);
-
-    interval = end_measure();
-    test_print("thread[%ld] end in %.3lf seconds\n", interval);
-}
-
 static void do_barrier(long id, const char* arg) {
     pthread_barrier_wait(&barrier);
     if (id == 0) {
@@ -152,28 +87,57 @@ static void do_barrier(long id, const char* arg) {
     }
 }
 
-void* test(void* arg) {
+static void do_push(long id, int expect_ret) {
+    int st, ed, i, ret;
+    double interval;
+
+    start_measure();
+
+    st = 1.0 * id / NUM_THREAD * N;
+    ed = 1.0 * (id + 1) / NUM_THREAD * N;
+
+    for (i = st; i < ed; i++) {
+        q_push(q, v[i]);
+        test_assert(expect_ret == -1 || ret == expect_ret);
+    }
+
+    interval = end_measure();
+    test_print("thread[%ld] end in %.3lf seconds\n", interval);
+}
+
+static void do_pop(long id, int expect_ret) {
+    int st, ed, i, ret;
+    double interval;
+    uval_t v;
+
+    start_measure();
+
+    st = 1.0 * id / NUM_THREAD * N;
+    ed = 1.0 * (id + 1) / NUM_THREAD * N;
+
+    for (i = st; i < ed; i++) {
+        q_pop(q, &v);
+        test_assert(expect_ret == -1 || ret == expect_ret);
+    }
+
+    interval = end_measure();
+    test_print("thread[%ld] end in %.3lf seconds\n", interval);
+}
+
+void* push_fun(void* arg) {
     long id = (long) arg;
 
-    do_insert(id, 0);
+    do_push(id, -1);
 
-    do_barrier(id, "INSERT");
+    do_barrier(id, "PUSH & POP");
+}
 
-    do_lookup(id, 0);
+void* pop_fun(void* arg) {
+    long id = (long) arg;
 
-    do_barrier(id, "LOOKUP");
+    do_pop(id, -1);
 
-    do_range(id);
-
-    do_barrier(id, "RANGE");
-
-    do_remove(id, 0);
-
-    do_barrier(id, "REMOVE");
-
-    do_lookup(id, -ENOENT);
-
-    do_barrier(id, "LOOKUP");
+    do_barrier(id, "PUSH & POP");
 }
 
 int main() {
@@ -181,21 +145,20 @@ int main() {
 
     gen_data();
 
-    sl = sl_create(30);
+    q = q_create(POOL_SIZE);
     
     pthread_barrier_init(&barrier, NULL, NUM_THREAD);
 
-    for (i = 0; i < NUM_THREAD; i++) {
-        ebr_thread_register(sl->ebr, i);
-        pthread_create(&tids[i], NULL, test, (void*) i);
+    for (i = 0; i < NUM_THREAD / 2; i++) {
+        pthread_create(&tids[i], NULL, push_fun, (void*) i);
+        pthread_create(&tids[NUM_THREAD / 2 + i], NULL, pop_fun, (void*) (NUM_THREAD / 2 + i));
     }
 
     for (i = 0; i < NUM_THREAD; i++) {
         pthread_join(tids[i], NULL);
-        ebr_thread_unregister(sl->ebr, i);
     }
 
-    sl_destroy(sl);
+    q_destroy(q);
 
     return 0;
 }

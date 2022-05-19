@@ -472,7 +472,8 @@ extern int bp_range(struct bp* bp, ukey_t k, unsigned int len, uval_t* v_arr) {
         read_lock(&page->lock);
         if (found == 0) {
             if (k_cmp(page->kv[page->length - 1].k, k) >= 0) {
-                for (; k_cmp(page->kv[i].k, k); i++);
+                for (; k_cmp(page->kv[i].k, k) < 0; i++);
+                assert(i < page->length);
                 found = 1;
             } else {
                 read_unlock(&page->lock);

@@ -12,8 +12,8 @@
 #endif
 #include "linked_list.h"
 
-#define N           10000
-#define NUM_THREAD  12
+#define N           100000
+#define NUM_THREAD  8
 
 #define RAND
 // #define DETAIL
@@ -177,7 +177,7 @@ void* test(void* arg) {
 }
 
 int main() {
-    int i;
+    long i;
 
     gen_data();
 

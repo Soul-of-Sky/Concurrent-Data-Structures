@@ -76,7 +76,6 @@ extern void ebr_put(struct ebr* ebr, void* addr, int tid) {
     pthread_mutex_unlock(&ebr->lock);
 
 #ifndef MANUAL_GC
-    ebr_exit(ebr, tid);
     ebr_try_gc(ebr);
 #endif
 }

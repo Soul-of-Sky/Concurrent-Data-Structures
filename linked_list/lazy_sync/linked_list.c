@@ -11,7 +11,7 @@
 static struct ll_node* malloc_node(ukey_t k, uval_t v) {
     struct ll_node* node = (struct ll_node*) malloc(sizeof(struct ll_node));
 
-    node->next = NULL;
+    node->next = (markable_t) 0;
     node->e.k = k;
     node->e.v = v;
     spin_lock_init(&node->lock);
@@ -30,9 +30,9 @@ struct ll* ll_create() {
     ll->head = malloc_node(0, 0);
     ll->tail = malloc_node(max_k, 0);
 
-    ll->head->next = ll->tail;
+    ll->head->next = (markable_t) ll->tail;
 
-    ll->ebr = ebr_create(free_node);
+    ll->ebr = ebr_create((free_fun_t) free_node);
 
     return ll;
 }
@@ -81,8 +81,8 @@ retry:
             return -EEXIST;
         } else {
             node = malloc_node(k, v);
-            node->next = curr;
-            pred->next = node;
+            node->next = (markable_t) curr;
+            pred->next = (markable_t) node;
 
             spin_unlock(&pred->lock);
             spin_unlock(&curr->lock);
@@ -139,7 +139,7 @@ retry:
     if (validate(pred, curr)) {
         if (k_cmp(curr->e.k, k) == 0) {
             curr->next = MARK_NODE(curr->next);
-            pred->next = GET_NODE(curr->next);
+            pred->next = (markable_t) GET_NODE(curr->next);
             ebr_put(ll->ebr, curr, tid);
 
             spin_unlock(&pred->lock);

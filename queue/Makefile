@@ -1,17 +1,17 @@
 CC = gcc
-CFLAGS = -g -O2 -I ../include
+CFLAGS = -g -O2 -I ../include -I ../reclamation
 LDFLAGS = -lpthread
 RM = rm -f
 
-all: blocking_test lock_free_test
+all: blocking_queue_test lock_free_queue_test
 
-blocking_test: blocking/queue.c test.c
+blocking_queue_test: blocking/queue.c blocking/test.c
 	$(CC) $^ $(CFLAGS) -I blocking $(LDFLAGS) -o $@
 
-lock_free_test: lock_free/queue.c test.c
+lock_free_queue_test: lock_free/queue.c lock_free/test.c ../reclamation/ebr.c
 	$(CC) $^ $(CFLAGS) -I lock_free $(LDFLAGS) -o $@
 
 clean:
-	$(RM) blocking_test 
-	$(RM) lock_free_test
+	$(RM) blocking_queue_test 
+	$(RM) lock_free_queue_test
 	$(RM) *.o

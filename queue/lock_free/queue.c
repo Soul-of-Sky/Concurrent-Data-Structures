@@ -15,6 +15,10 @@ static struct q_node* alloc_node(uval_t v) {
     return node;
 }
 
+static void free_node(struct q_node* node) {
+    free(node);
+}
+
 struct queue* q_create() {
     struct queue* q = (struct queue*) malloc(sizeof(struct queue));
     struct q_node* node = alloc_node(0);
@@ -22,11 +26,9 @@ struct queue* q_create() {
     q->head = node;
     q->tail = node;
 
-    return q;
-}
+    q->ebr = ebr_create((free_fun_t) free_node);
 
-static void free_node(struct q_node* node) {
-    // free(node);
+    return q;
 }
 
 void q_destroy(struct queue* q) {
@@ -40,12 +42,16 @@ void q_destroy(struct queue* q) {
         pred = curr;
     }
 
+    ebr_destroy(q->ebr);
+
     free(q);
 }
 
-void q_push(struct queue* q, uval_t v) {
+void q_push(struct queue* q, uval_t v, int tid) {
     struct q_node* node = alloc_node(v);
     struct q_node *last, *next;
+
+    ebr_enter(q->ebr, tid);
 
     while(1) {
         last = q->tail;
@@ -54,6 +60,7 @@ void q_push(struct queue* q, uval_t v) {
             if (next == NULL) {
                 if (cmpxchg2(&last->next, next, node)) {
                     cmpxchg2(&q->tail, last, node);
+                    ebr_exit(q->ebr, tid);
                     return;
                 }
             } else {
@@ -63,11 +70,12 @@ void q_push(struct queue* q, uval_t v) {
     }
 }
 
-int q_pop(struct queue* q, uval_t* v) {
+int q_pop(struct queue* q, uval_t* v, int tid) {
     struct q_node *first, *last, *next;
 
-    *v = 0;
+    ebr_enter(q->ebr, tid);
 
+    *v = 0;
     while(1) {
         last = q->tail;
         first = q->head;
@@ -75,13 +83,15 @@ int q_pop(struct queue* q, uval_t* v) {
         if (first == q->head) {
             if (first == last) {
                 if (next == NULL) {
+                    ebr_exit(q->ebr, tid);
                     return -ENOENT;
                 }
                 cmpxchg2(&q->tail, last, next);
             } else {
                 *v = next->v;
                 if (cmpxchg2(&q->head, first, next)) {
-                    free_node(first);
+                    ebr_put(q->ebr, first, tid);
+                    ebr_exit(q->ebr, tid);
                     return 0;
                 }
             }
@@ -89,11 +99,12 @@ int q_pop(struct queue* q, uval_t* v) {
     }
 }
 
-int q_front(struct queue* q, uval_t* v) {
+int q_front(struct queue* q, uval_t* v, int tid) {
     struct q_node *first, *last, *next;
 
-    *v = 0;
+    ebr_enter(q->ebr, tid);
 
+    *v = 0;
     while(1) {
         last = q->tail;
         first = q->head;
@@ -101,11 +112,13 @@ int q_front(struct queue* q, uval_t* v) {
         if (first == q->head) {
             if (first == last) {
                 if (next == NULL) {
+                    ebr_exit(q->ebr, tid);
                     return -ENOENT;
                 }
                 cmpxchg2(&q->tail, last, next);
             } else {
                 *v = next->v;
+                ebr_exit(q->ebr, tid);
                 return 0;
             }
         }

@@ -12,15 +12,13 @@
 #endif
 #include "queue.h"
 
-#define N           1000000
+#define N           10000000
 /*NUM_THREAD HAS TO BE AN ODD*/
-#define NUM_THREAD  4
-
-#define POOL_SIZE   10000
+#define NUM_THREAD  8
 
 #define RAND
 // #define DETAIL
-// #define ASSERT
+#define ASSERT
 
 #ifdef DETAIL
 #define test_print(fmt, args ...) do{printf(fmt, ##args);}while(0)
@@ -97,7 +95,7 @@ static void do_push(long id, int expect_ret) {
     ed = 1.0 * (id + 1) / NUM_THREAD * N;
 
     for (i = st; i < ed; i++) {
-        q_push(q, v[i]);
+        q_push(q, v[i], (int) id);
         test_assert(expect_ret == -1 || ret == expect_ret);
     }
 
@@ -116,7 +114,7 @@ static void do_pop(long id, int expect_ret) {
     ed = 1.0 * (id + 1) / NUM_THREAD * N;
 
     for (i = st; i < ed; i++) {
-        q_pop(q, &v);
+        q_pop(q, &v, (int) id);
         test_assert(expect_ret == -1 || ret == expect_ret);
     }
 
@@ -141,21 +139,24 @@ void* pop_fun(void* arg) {
 }
 
 int main() {
-    int i;
+    long i;
 
     gen_data();
 
-    q = q_create(POOL_SIZE);
+    q = q_create();
     
     pthread_barrier_init(&barrier, NULL, NUM_THREAD);
 
     for (i = 0; i < NUM_THREAD / 2; i++) {
+        ebr_thread_register(q->ebr, i);
+        ebr_thread_register(q->ebr, NUM_THREAD / 2 + i);
         pthread_create(&tids[i], NULL, push_fun, (void*) i);
         pthread_create(&tids[NUM_THREAD / 2 + i], NULL, pop_fun, (void*) (NUM_THREAD / 2 + i));
     }
 
     for (i = 0; i < NUM_THREAD; i++) {
         pthread_join(tids[i], NULL);
+        ebr_thread_unregister(q->ebr, i);
     }
 
     q_destroy(q);

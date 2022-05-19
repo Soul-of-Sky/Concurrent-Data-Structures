@@ -22,6 +22,10 @@ static struct sl_node* alloc_node(int levels, ukey_t k, uval_t v) {
     return node;
 }
 
+static void free_node(struct sl_node* node) {
+    free(node);
+}
+
 struct sl* sl_create(int max_levels) {
     assert(max_levels > 0);
     srand(time(0));
@@ -32,18 +36,16 @@ struct sl* sl_create(int max_levels) {
     sl->max_levels = max_levels;
     sl->levels = 1;
 
-    sl->head = alloc_node(max_levels, 0, NULL);
-    sl->tail = alloc_node(max_levels, UINT64_MAX, NULL);
+    sl->head = alloc_node(max_levels, 0, 0);
+    sl->tail = alloc_node(max_levels, UINT64_MAX, 0);
 
     for (i = 0; i < max_levels; i++) {
-        sl->head->next[i] = sl->tail;
+        sl->head->next[i] = (markable_t) sl->tail;
     }
 
-    return sl;
-}
+    sl->ebr = ebr_create((free_fun_t) free_node);
 
-static void free_node(struct sl_node* node) {
-    free(node);
+    return sl;
 }
 
 void sl_destroy(struct sl* sl) {
@@ -55,11 +57,13 @@ void sl_destroy(struct sl* sl) {
         free_node(pred);
         pred = curr;
     }
+    
+    ebr_destroy(sl->ebr);
 
     free(sl);
 }
 
-static int find(struct sl* sl, ukey_t k, struct sl_node** preds, struct sl_node** succs) {
+static int find(struct sl* sl, ukey_t k, struct sl_node** preds, struct sl_node** succs, int tid) {
     struct sl_node *pred, *curr, *succ;
     int i;
 
@@ -73,10 +77,12 @@ retry:
                 if (!cmpxchg2(&pred->next[i], curr, succ)) {
                     goto retry;
                 }
+                if (i == 0) {
+                    ebr_put(sl->ebr, curr, tid);
+                }
+
                 curr = GET_NODE(pred->next[i]);
                 succ = GET_NODE(curr->next[i]);
-
-                //TODO: free node
             }
             if (k_cmp(curr->e.k, k) < 0) {
                 pred = curr;
@@ -93,7 +99,7 @@ retry:
 }
 
 static int get_rand_levels(struct sl* sl) {
-    int levels = 1;
+    int levels = 1, old;
 
     while(rand() & 1) {
         levels++;
@@ -103,30 +109,35 @@ static int get_rand_levels(struct sl* sl) {
         levels = sl->max_levels;
     }
 
-    if (levels > sl->levels) {
-        levels = xadd(&sl->levels, 1);
+    old = ACCESS_ONCE(sl->levels);
+    if (levels > old) {
+        cmpxchg(&sl->levels, old, old + 1);
+        levels = old + 1;
     }
 
     return levels;
 }
 
-int sl_insert(struct sl* sl, ukey_t k, uval_t v) {
+int sl_insert(struct sl* sl, ukey_t k, uval_t v, int tid) {
     const int max_levels = sl->max_levels;
     struct sl_node* preds[max_levels];
     struct sl_node* succs[max_levels];
     struct sl_node *pred, *succ, *node;
     int node_levels;
     int i;
-    
+
+    ebr_enter(sl->ebr, tid);
+
     node_levels = get_rand_levels(sl);
 
 retry:
-    if (find(sl, k, preds, succs)) {
+    if (find(sl, k, preds, succs, tid)) {
+        ebr_exit(sl->ebr, tid);
         return -EEXIST;
     } else {
         node = alloc_node(node_levels, k, v);
         for (i = 0; i < node_levels; i++) {
-            node->next[i] = succs[i];
+            node->next[i] = (markable_t) succs[i];
         }
         if (!(cmpxchg2(&preds[0]->next[0], succs[0], node))) {
             free_node(node);
@@ -137,19 +148,21 @@ retry2:
             pred = preds[i];
             succ = succs[i];
             if (!(cmpxchg2(&pred->next[i], succ, node))) {
-                find(sl, k, preds, succs);
+                find(sl, k, preds, succs, tid);
                 goto retry2;
             }
         }
-
+        ebr_exit(sl->ebr, tid);
         return 0;
     }
     
 }
 
-int sl_lookup(struct sl* sl, ukey_t k, uval_t* v) {
+int sl_lookup(struct sl* sl, ukey_t k, uval_t* v, int tid) {
     struct sl_node *pred, *curr, *succ;
-    int i;
+    int ret, i;
+
+    ebr_enter(sl->ebr, tid);
 
     pred = sl->head;
     for (i = sl->max_levels - 1; i >= 0; i--) {
@@ -169,18 +182,26 @@ int sl_lookup(struct sl* sl, ukey_t k, uval_t* v) {
         }
     }
 
-    return k_cmp(curr->e.k, k) == 0 ? 0 : -ENOENT; 
+    *v = curr->e.v;
+    ret = k_cmp(curr->e.k, k) == 0 ? 0 : -ENOENT; 
+    
+    ebr_exit(sl->ebr, tid);
+
+    return ret;
 }
 
-int sl_remove(struct sl* sl, ukey_t k) {
+int sl_remove(struct sl* sl, ukey_t k, int tid) {
    const int max_levels = sl->max_levels;
     struct sl_node* preds[max_levels];
     struct sl_node* succs[max_levels];
     struct sl_node *pred, *succ, *node;
     int i;
 
+    ebr_enter(sl->ebr, tid);
+
 retry:
-    if (!find(sl, k, preds, succs)) {
+    if (!find(sl, k, preds, succs, tid)) {
+        ebr_exit(sl->ebr, tid);
         return -ENOENT;
     } else {
         node = succs[0];
@@ -194,22 +215,26 @@ retry:
             succ = GET_NODE(node->next[0]);
             if (cmpxchg2(&node->next[0], succ, MARK_NODE2(succ))) {
                 /* try to remove physically */
-                find(sl, k, preds, succs);
+                find(sl, k, preds, succs, tid);
+                ebr_exit(sl->ebr, tid);
                 return 0;
             }
         }
+        ebr_exit(sl->ebr, tid);
         return -ENOENT;
     }
 }
 
-int sl_range(struct sl* sl, ukey_t k, unsigned int len, uval_t* v_arr) {
+int sl_range(struct sl* sl, ukey_t k, unsigned int len, uval_t* v_arr, int tid) {
     const int max_levels = sl->max_levels;
     struct sl_node* preds[max_levels];
     struct sl_node* succs[max_levels];
     struct sl_node *curr, *pred;
     int cnt = 0;
 
-    find(sl, k, preds, succs);
+    ebr_enter(sl->ebr, tid);
+
+    find(sl, k, preds, succs, tid);
     pred = succs[0];
 
     while(pred != sl->tail) {
@@ -220,6 +245,8 @@ int sl_range(struct sl* sl, ukey_t k, unsigned int len, uval_t* v_arr) {
         pred = curr;
     }
 
+    ebr_exit(sl->ebr, tid);
+
     return cnt;
 }
 
@@ -227,7 +254,7 @@ void sl_print(struct sl* sl) {
     struct sl_node* node;
     int i;
 
-    for (i = sl->levels; i >= 0; i--) {
+    for (i = ACCESS_ONCE(sl->levels); i >= 0; i--) {
         printf("level [%d]: ", i);
         node = GET_NODE(sl->head->next[i]);
         while(node != sl->tail) {

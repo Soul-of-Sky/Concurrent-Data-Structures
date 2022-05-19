@@ -23,6 +23,10 @@ static struct sl_node* alloc_node(int levels, ukey_t k, uval_t v) {
     return node;
 }
 
+static void free_node(struct sl_node* node) {
+    free(node);
+}
+
 struct sl* sl_create(int max_levels) {
     assert(max_levels > 0);
     srand(time(0));
@@ -33,21 +37,19 @@ struct sl* sl_create(int max_levels) {
     sl->max_levels = max_levels;
     sl->levels = 1;
 
-    sl->head = alloc_node(max_levels, 0, NULL);
-    sl->tail = alloc_node(max_levels, UINT64_MAX, NULL);
+    sl->head = alloc_node(max_levels, 0, 0);
+    sl->tail = alloc_node(max_levels, UINT64_MAX, 0);
 
     for (i = 0; i < max_levels; i++) {
-        sl->head->next[i] = sl->tail;
+        sl->head->next[i] = (markable_t) sl->tail;
     }
 
     GET_SIGN(sl->head) = FULLY_LINK(sl->head);
     GET_SIGN(sl->tail) = FULLY_LINK(sl->tail);
 
-    return sl;
-}
+    sl->ebr = ebr_create((free_fun_t) free_node);
 
-static void free_node(struct sl_node* node) {
-    free(node);
+    return sl;
 }
 
 void sl_destroy(struct sl* sl) {
@@ -59,6 +61,8 @@ void sl_destroy(struct sl* sl) {
         free_node(pred);
         pred = curr;
     }
+
+    ebr_destroy(sl->ebr);
 
     free(sl);
 }
@@ -86,7 +90,7 @@ static int find(struct sl* sl, ukey_t k, struct sl_node** preds, struct sl_node*
 }
 
 static int get_rand_levels(struct sl* sl) {
-    int levels = 1;
+    int levels = 1, old;
 
     while(rand() & 1) {
         levels++;
@@ -96,14 +100,16 @@ static int get_rand_levels(struct sl* sl) {
         levels = sl->max_levels;
     }
 
-    if (levels > sl->levels) {
-        levels = xadd(&sl->levels, 1);
+    old = ACCESS_ONCE(sl->levels);
+    if (levels > old) {
+        cmpxchg(&sl->levels, old, old + 1);
+        levels = old + 1;
     }
 
     return levels;
 }
 
-int sl_insert(struct sl* sl, ukey_t k, uval_t v) {
+int sl_insert(struct sl* sl, ukey_t k, uval_t v, int tid) {
     const int max_levels = sl->max_levels;
     struct sl_node* preds[max_levels];
     struct sl_node* succs[max_levels];
@@ -111,7 +117,9 @@ int sl_insert(struct sl* sl, ukey_t k, uval_t v) {
     int found_level, locked_level, all_locked;
     int node_levels;
     int i;
-    
+
+    ebr_enter(sl->ebr, tid);
+
     node_levels = get_rand_levels(sl);
 
 retry:
@@ -121,6 +129,7 @@ retry:
             goto retry;
         } else {
             while(!IS_FULLY_LINKED(succs[found_level]));
+            ebr_exit(sl->ebr, tid);
             return -EEXIST;
         }
     }
@@ -152,11 +161,11 @@ retry:
 
     node = alloc_node(node_levels, k, v);
     
-    node->next[0] = succs[0];
+    node->next[0] = (markable_t) succs[0];
     preds[0]->next[0] = FULLY_LINK2(node);
     for (i = 1; i < node_levels; i++) {
-        node->next[i] = succs[i];
-        preds[i]->next[i] = node;
+        node->next[i] = (markable_t) succs[i];
+        preds[i]->next[i] = (markable_t) node;
     }
     GET_SIGN(node) = FULLY_LINK(node);
 
@@ -166,10 +175,13 @@ retry:
             spin_unlock(&pred->lock);
         }
     }
+
+    ebr_exit(sl->ebr, tid);
+
     return 0;
 }
 
-int sl_lookup(struct sl* sl, ukey_t k, uval_t* v) {
+int sl_lookup(struct sl* sl, ukey_t k, uval_t* v, int tid) {
     const int max_levels = sl->max_levels;
     struct sl_node* preds[max_levels];
     struct sl_node* succs[max_levels];
@@ -181,20 +193,26 @@ int sl_lookup(struct sl* sl, ukey_t k, uval_t* v) {
 
     if (found_level != -1 && IS_FULLY_LINKED(node) && !IS_MARKED(node)) {
         *v = node->e.v;
+
+        ebr_exit(sl->ebr, tid);
         return 0;
     }
 
     *v = 0;
+
+    ebr_exit(sl->ebr, tid);
     return -ENOENT;
 }
 
-int sl_remove(struct sl* sl, ukey_t k) {
+int sl_remove(struct sl* sl, ukey_t k, int tid) {
     const int max_levels = sl->max_levels;
     struct sl_node* preds[max_levels];
     struct sl_node* succs[max_levels];
     struct sl_node *pred, *succ, *node;
     int found_level, locked_level, node_levels;
     int is_marked = 0, all_locked, i;
+
+    ebr_enter(sl->ebr, tid);
 
 retry:
     found_level = find(sl, k, preds, succs);
@@ -207,6 +225,8 @@ retry:
         spin_lock(&node->lock);
         if (IS_MARKED(node)) {
             spin_unlock(&node->lock);
+
+            ebr_exit(sl->ebr, tid);
             return -ENOENT;
         }
         node_levels = node->levels;
@@ -253,15 +273,20 @@ retry:
         }
     }
 
+    ebr_put(sl->ebr, node, tid);
+    ebr_exit(sl->ebr, tid);
+
     return 0;
 }
 
-int sl_range(struct sl* sl, ukey_t k, unsigned int len, uval_t* v_arr) {
+int sl_range(struct sl* sl, ukey_t k, unsigned int len, uval_t* v_arr, int tid) {
     const int max_levels = sl->max_levels;
     struct sl_node* preds[max_levels];
     struct sl_node* succs[max_levels];
     struct sl_node *curr, *pred;
     int cnt = 0;
+
+    ebr_enter(sl->ebr, tid);
 
     find(sl, k, preds, succs);
     pred = succs[0];
@@ -274,6 +299,7 @@ int sl_range(struct sl* sl, ukey_t k, unsigned int len, uval_t* v_arr) {
         pred = curr;
     }
 
+    ebr_exit(sl->ebr, tid);
     return cnt;
 }
 
@@ -281,7 +307,7 @@ void sl_print(struct sl* sl) {
     struct sl_node* node;
     int i;
 
-    for (i = sl->levels; i >= 0; i--) {
+    for (i = ACCESS_ONCE(sl->levels); i >= 0; i--) {
         printf("level [%d]: ", i);
         node = GET_NODE(sl->head->next[i]);
         while(node != sl->tail) {

@@ -1,4 +1,4 @@
-# Concurrent Data Structure
+# Concurrent Data Structures
 
 ## Introduction
 
@@ -12,16 +12,16 @@ C language implementation of common concurrent data structures with multiple mem
 | EBR                                  |   O   |   O    |         --         |       --       |
 | HPBR                                 |   O   |   O    |         --         |       --       |
 | lazy-sync linked list                |   O   |   O    |         O          |       O        |
-| lock-free linked list                |   O   |   O    |         X          |                |
-| producer-consumer queue              |   O   |   O    |         X          |                |
-| lazy-sync queue                      |   O   |   O    |         X          |                |
-| lock-free back-off stack             |   O   |   O    |         X          |                |
-| lock-free elimination back-off stack |   O   |   O    |         X          |                |
-| lock-free hashset                    |   O   |   O    |         X          |                |
-| concurrent heap                      |   O   |   O    |         X          |                |
-| lazy-sync skiplist                   |   O   |   O    |         X          |                |
-| lock-free skiplist                   |   O   |   O    |         X          |                |
-| concurrent b+tree                    |   O   |   O    |         --         |                |
+| lock-free linked list                |   O   |   O    |         O          |       O        |
+| producer-consumer(blocking) queue    |   O   |   O    |         --         |       O        |
+| lazy-sync queue                      |   O   |   O    |         O          |       O        |
+| lock-free back-off stack             |   O   |   O    |         O          |       O        |
+| lock-free elimination back-off stack |   O   |   O    |         O          |       O        |
+| lock-free hashset                    |   O   |   O    |         O          |       O        |
+| concurrent heap                      |   O   |   O    |         --         |       O        |
+| lazy-sync skiplist                   |   O   |   O    |         O          |       O        |
+| lock-free skiplist                   |   O   |   O    |         O          |       O        |
+| concurrent b+tree                    |   O   |   O    |         --         |       O        |
 
 * Concurrent Data Structures:
 

@@ -5,6 +5,7 @@
 #include <stdio.h>
 
 #include "util.h"
+#include "ebr.h"
 
 typedef size_t markable_t;
 
@@ -17,7 +18,8 @@ struct sl_node {
 struct sl {
     struct sl_node *head, *tail;
     int max_levels;
-    volatile int levels;
+    int levels;
+    struct ebr* ebr;
 };
 
 #define IS_TAGED(v, t)      ((unsigned long) (v) & t)
@@ -31,14 +33,14 @@ struct sl {
 #define MARK_NODE2(n)       ADD_TAG(n, 0x1)
 #define REMOVE_MARK(n, i)   DEL_TAG(GET_SIGN(n, i), 0x1)
 
-#define GET_NODE(v)         ((struct ll_node*) DEL_TAG(v, 0x1))
+#define GET_NODE(v)         ((struct sl_node*) DEL_TAG(v, 0x1))
 
 extern struct sl* sl_create(int max_levels);
 extern void sl_destroy(struct sl* sl);
-extern int sl_insert(struct sl* sl, ukey_t k, uval_t v);
-extern int sl_lookup(struct sl* sl, ukey_t k, uval_t* v);
-extern int sl_remove(struct sl* sl, ukey_t k);
-extern int sl_range(struct sl* sl, ukey_t k, unsigned int len, uval_t* v_arr);
+extern int sl_insert(struct sl* sl, ukey_t k, uval_t v, int tid);
+extern int sl_lookup(struct sl* sl, ukey_t k, uval_t* v, int tid);
+extern int sl_remove(struct sl* sl, ukey_t k, int tid);
+extern int sl_range(struct sl* sl, ukey_t k, unsigned int len, uval_t* v_arr, int tid);
 extern void ll_print(struct sl* sl);
 
 #ifdef SL_DEBUG
