@@ -2,7 +2,7 @@
 
 ## Introduction
 
-C language implementation of common concurrent data structures with multiple memory reclamations.
+C implementation of common concurrent data structures with multiple memory reclamations.
 
 ## Schedule
 
