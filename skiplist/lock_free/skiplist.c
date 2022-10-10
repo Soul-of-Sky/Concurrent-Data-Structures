@@ -170,7 +170,7 @@ int sl_lookup(struct sl* sl, ukey_t k, uval_t* v, int tid) {
         while(1) {
             succ = GET_NODE(curr->next[i]);
             while(IS_MARKED(curr, i)) {
-                curr = GET_NODE(pred->next[i]);
+                curr = curr;
                 succ = GET_NODE(curr->next[i]);
             }
             if (k_cmp(curr->e.k, k) < 0) {
